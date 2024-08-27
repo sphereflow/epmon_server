@@ -138,22 +138,7 @@ impl Application for State {
                 remote_data_receiver,
                 command_sender,
             },
-            iced::Command::batch([
-                font::load(
-                    include_bytes!(
-                        "/home/jp/.local/share/fonts/DejaVuSansMono/DejaVuSansMNerdFontMono-Regular.ttf"
-                    )
-                    .as_slice(),
-                )
-                .map(Message::FontLoaded),
-                font::load(
-                    include_bytes!(
-                        "/home/jp/.local/share/fonts/DejaVuSansMono/DejaVuSansMNerdFontMono-Bold.ttf"
-                    )
-                    .as_slice(),
-                )
-                .map(Message::FontLoaded),
-            ]),
+            iced::Command::none(),
         )
     }
 
