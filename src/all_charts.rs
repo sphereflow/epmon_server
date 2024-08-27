@@ -137,7 +137,7 @@ impl AllCharts {
         let spacer = iced::widget::Space::new(30.0, 30.0);
         let mut pause_holding_col = Column::new();
 
-        let holding_text_input = text_input(
+        let register_text_input = text_input(
             "enter register address of holding",
             &self.register_address_string,
         )
@@ -146,13 +146,18 @@ impl AllCharts {
             register_address: self.register_address,
             size: 1,
         });
+        let register_button = Button::new("get").on_press(Message::ReadRegisters {
+            register_address: self.register_address,
+            size: 1,
+        });
         let register_numeric_text =
             text(format!("numeric register value: {}", self.register_address));
         let holding_text = text(format!("holding val: {:?}", self.holding_val));
         pause_holding_col = pause_holding_col
             .push(pause_button)
-            .push(holding_text_input)
+            .push(register_text_input)
             .push(holding_button)
+            .push(register_button)
             .push(register_numeric_text)
             .push(holding_text);
 
