@@ -94,18 +94,18 @@ impl AllCharts {
             self.max_time_day,
             Message::MaxTimeDaySelected,
         )
-        .width(1000);
+        .width(500);
         let max_time_slider = Slider::new(-3600.0..=0.0, self.max_time, Message::MaxTimeSelected)
             .step(1.0)
             .shift_step(0.1)
-            .width(1000);
+            .width(500);
         let max_time_slider_fine = Slider::new(
             -100.0..=0.0,
             self.max_time_fine,
             Message::MaxTimeFineSelected,
         )
         .step(0.1)
-        .width(1000);
+        .width(500);
         control_row = control_row
             .push(iced::widget::column![
                 max_time_slider_day,
