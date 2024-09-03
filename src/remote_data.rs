@@ -15,6 +15,7 @@ pub enum RemoteData {
     VoltageBufferSize(usize),
     Intervalms(u16),
     Holdings(Vec<u8>),
+    InputRegisters(Vec<u8>),
 }
 
 impl RemoteData {
@@ -86,6 +87,25 @@ impl RemoteData {
             let mut read_buf = vec![0; (size * 2) as usize];
             tcp_stream.read_exact(&mut read_buf)?;
             Ok(RemoteData::Holdings(read_buf))
+        } else {
+            Err(ErrorKind::InvalidInput.into())
+        }
+    }
+
+    pub fn get_input_registers(
+        tcp_stream: &mut TcpStream,
+        command: command::Command,
+    ) -> std::io::Result<RemoteData> {
+        let write_buf = command.to_bytes();
+        if let command::Command::ModbusGetInputRegisters {
+            register_address: _,
+            size,
+        } = command
+        {
+            tcp_stream.write_all(&write_buf)?;
+            let mut read_buf = vec![0; (size * 2) as usize];
+            tcp_stream.read_exact(&mut read_buf)?;
+            Ok(RemoteData::InputRegisters(read_buf))
         } else {
             Err(ErrorKind::InvalidInput.into())
         }

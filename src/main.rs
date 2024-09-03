@@ -18,6 +18,7 @@ pub mod command;
 pub mod remote_data;
 pub mod server_task;
 pub mod time_interval;
+pub mod tracer_an;
 pub mod udp_broadcast_task;
 pub mod voltage_chart;
 
@@ -110,7 +111,8 @@ impl State {
                 self.charts.battery_pack.tick_len = tick_len;
                 self.charts.pv.tick_len = tick_len;
             }
-            RemoteData::Holdings(val) => self.charts.holding_val = val,
+            RemoteData::Holdings(val) => self.charts.modbus_val = val,
+            RemoteData::InputRegisters(val) => self.charts.modbus_val = val,
         }
         if bupdate_battery2 {
             self.charts.update_battery2();

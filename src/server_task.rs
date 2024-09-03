@@ -86,6 +86,18 @@ pub fn server_task(
                             continue 'outer;
                         }
                     }
+                    if let command::Command::ModbusGetInputRegisters { .. } = command {
+                        println!("getting_input_registers");
+                        if let Ok(val) = RemoteData::get_input_registers(&mut tcp_stream, command) {
+                            println!("Input reg val: {:?}", &val);
+                            remote_data_sender.send(val).unwrap();
+                        } else {
+                            if let Ok(mut mgc) = connected.lock() {
+                                *mgc = false;
+                            }
+                            continue 'outer;
+                        }
+                    }
                 }
 
                 thread::sleep(Duration::from_millis(500));

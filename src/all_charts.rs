@@ -15,7 +15,7 @@ pub struct AllCharts {
     pub max_voltage: f32,
     pub register_address_string: String,
     pub register_address: u16,
-    pub holding_val: Vec<u8>,
+    pub modbus_val: Vec<u8>,
     pub paused: bool,
 }
 
@@ -51,7 +51,7 @@ impl Default for AllCharts {
             paused: false,
             register_address: 0,
             register_address_string: String::new(),
-            holding_val: Vec::new(),
+            modbus_val: Vec::new(),
         }
     }
 }
@@ -146,13 +146,13 @@ impl AllCharts {
             register_address: self.register_address,
             size: 1,
         });
-        let register_button = Button::new("get").on_press(Message::ReadRegisters {
+        let register_button = Button::new("get input register").on_press(Message::ReadRegisters {
             register_address: self.register_address,
             size: 1,
         });
         let register_numeric_text =
             text(format!("numeric register value: {}", self.register_address));
-        let holding_text = text(format!("holding val: {:?}", self.holding_val));
+        let holding_text = text(format!("holding val: {:?}", self.modbus_val));
         pause_holding_col = pause_holding_col
             .push(pause_button)
             .push(register_text_input)
