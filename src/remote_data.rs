@@ -97,6 +97,7 @@ impl RemoteData {
         command: command::Command,
     ) -> std::io::Result<RemoteData> {
         let write_buf = command.to_bytes();
+        println!("Sending Command: {:?}", command);
         if let command::Command::ModbusGetInputRegisters {
             register_address: _,
             size,

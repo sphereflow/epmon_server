@@ -1,8 +1,13 @@
-use crate::{time_interval::TimeInterval, voltage_chart::VoltageChart, Message, CHART_HEIGHT};
+use crate::{
+    time_interval::TimeInterval, tracer_an::two_bytes_to_f32, voltage_chart::VoltageChart, Message,
+    CHART_HEIGHT,
+};
 use iced::{widget::*, Alignment, Element, Length};
+use iced_aw::{TabBar, TabLabel};
 
 #[derive(Debug)]
 pub struct AllCharts {
+    pub selected_tab: SelectedTab,
     pub battery1: VoltageChart,
     pub battery2: VoltageChart,
     pub battery_pack: VoltageChart,
@@ -16,6 +21,7 @@ pub struct AllCharts {
     pub register_address_string: String,
     pub register_address: u16,
     pub modbus_val: Vec<u8>,
+    pub chart_controls: bool,
     pub paused: bool,
 }
 
@@ -38,6 +44,7 @@ impl Default for AllCharts {
             ..Default::default()
         };
         AllCharts {
+            selected_tab: SelectedTab::VoltageCharts,
             battery1,
             battery2,
             battery_pack,
@@ -48,6 +55,7 @@ impl Default for AllCharts {
             max_time_fine: 0.0,
             max_voltage: 100.0,
             time_correctness: 1.0,
+            chart_controls: true,
             paused: false,
             register_address: 0,
             register_address_string: String::new(),
@@ -58,9 +66,52 @@ impl Default for AllCharts {
 
 impl AllCharts {
     pub fn view(&self) -> Element<Message> {
-        let mut control_row = Row::new();
-        let selected = self.selected_time_interval;
+        let tab_bar = TabBar::new(Message::TabSelected)
+            .push(0, TabLabel::Text(String::from("Voltage Charts")))
+            .push(1, TabLabel::Text(String::from("Modbus")));
 
+        let main_contents = match self.selected_tab {
+            SelectedTab::VoltageCharts => self.view_charts(),
+            SelectedTab::Modbus => self.view_modbus(),
+        };
+        Scrollable::new(Column::new().push(tab_bar).push(main_contents))
+            .height(Length::Shrink)
+            .into()
+    }
+
+    fn view_charts(&self) -> Column<Message> {
+        let control_row = self.view_chart_controls();
+        let row1 = Row::new()
+            .spacing(15)
+            .padding(20)
+            .width(Length::Fill)
+            .height(Length::Shrink)
+            .align_items(Alignment::Center)
+            .push(self.battery_pack.view(0, CHART_HEIGHT))
+            .push(self.battery1.view(1, CHART_HEIGHT));
+        let row2 = Row::new()
+            .spacing(15)
+            .padding(20)
+            .width(Length::Fill)
+            .height(Length::Shrink)
+            .align_items(Alignment::Center)
+            .push(self.pv.view(0, CHART_HEIGHT))
+            .push(self.battery2.view(1, CHART_HEIGHT));
+
+        Column::new()
+            .width(Length::Fill)
+            .height(Length::Shrink)
+            .align_items(Alignment::Start)
+            .push(control_row)
+            .push(row1)
+            .push(row2)
+    }
+
+    fn view_chart_controls(&self) -> Row<Message> {
+        let selected = self.selected_time_interval;
+        let control_row = Row::new();
+        let toggle_chart_controls = Button::new(if self.chart_controls { "-" } else { "+" })
+            .on_press(Message::ToggleChartControls);
         let make_radio = |&(label, value)| {
             Radio::new(label, value, Some(selected), Message::TimeIntervallSelected).into()
         };
@@ -80,14 +131,8 @@ impl AllCharts {
         ];
         let radios1 = radio_data[..6].iter().map(make_radio);
         let radios2 = radio_data[6..].iter().map(make_radio);
-
         let time_intervall_column1 = Column::with_children(radios1);
         let time_intervall_column2 = Column::with_children(radios2);
-        let spacer = iced::widget::Space::new(30.0, 30.0);
-        control_row = control_row
-            .push(time_intervall_column1)
-            .push(time_intervall_column2)
-            .push(spacer);
 
         let max_time_slider_day = Slider::new(
             (-3600.0 * 24.0)..=0.0,
@@ -106,37 +151,44 @@ impl AllCharts {
         )
         .step(0.1)
         .width(500);
-        control_row = control_row
-            .push(iced::widget::column![
-                max_time_slider_day,
-                Space::new(30.0, 30.0),
-                max_time_slider,
-                Space::new(30.0, 30.0),
-                max_time_slider_fine,
-            ])
-            .push(Space::new(30.0, 30.0));
-
         let max_voltage_slider =
             VerticalSlider::new(10.0..=200.0, self.max_voltage, Message::MaxVoltageSelected)
                 .step(1.0)
                 .height(200.0);
-        control_row = control_row
-            .push(max_voltage_slider)
-            .push(Space::new(30.0, 10.0))
-            .push(text(format!(
-                "time correctness: {:.2} %",
-                self.time_correctness * 100.0
-            )));
-
         let pause_button = if self.paused {
             Button::new("unpause")
         } else {
             Button::new("pause")
         }
         .on_press(Message::PauseUnpause);
-        let spacer = iced::widget::Space::new(30.0, 30.0);
-        let mut pause_holding_col = Column::new();
 
+        if self.chart_controls {
+            control_row
+                .push(toggle_chart_controls)
+                .push(time_intervall_column1)
+                .push(time_intervall_column2)
+                .push(Space::new(30., 30.))
+                .push(iced::widget::column![
+                    max_time_slider_day,
+                    Space::new(30.0, 30.0),
+                    max_time_slider,
+                    Space::new(30.0, 30.0),
+                    max_time_slider_fine,
+                ])
+                .push(Space::new(30.0, 30.0))
+                .push(max_voltage_slider)
+                .push(Space::new(30.0, 10.0))
+                .push(text(format!(
+                    "time correctness: {:.2} %",
+                    self.time_correctness * 100.0
+                )))
+                .push(Space::new(30., 30.))
+                .push(pause_button)
+        } else {
+            control_row.push(toggle_chart_controls)
+        }
+    }
+    fn view_modbus(&self) -> Column<Message> {
         let register_text_input = text_input(
             "enter register address of holding",
             &self.register_address_string,
@@ -152,42 +204,20 @@ impl AllCharts {
         });
         let register_numeric_text =
             text(format!("numeric register value: {}", self.register_address));
-        let holding_text = text(format!("holding val: {:?}", self.modbus_val));
-        pause_holding_col = pause_holding_col
-            .push(pause_button)
+        let holding_text = if self.modbus_val.len() >= 2 {
+            text(format!(
+                "received value: {:?}",
+                two_bytes_to_f32([self.modbus_val[0], self.modbus_val[1]])
+            ))
+        } else {
+            text("no value")
+        };
+        Column::new()
             .push(register_text_input)
             .push(holding_button)
             .push(register_button)
             .push(register_numeric_text)
-            .push(holding_text);
-
-        control_row = control_row.push(spacer).push(pause_holding_col);
-
-        let row1 = Row::new()
-            .spacing(15)
-            .padding(20)
-            .width(Length::Fill)
-            .height(Length::Shrink)
-            .align_items(Alignment::Center)
-            .push(self.battery_pack.view(0, CHART_HEIGHT))
-            .push(self.battery1.view(1, CHART_HEIGHT));
-        let row2 = Row::new()
-            .spacing(15)
-            .padding(20)
-            .width(Length::Fill)
-            .height(Length::Shrink)
-            .align_items(Alignment::Center)
-            .push(self.pv.view(0, CHART_HEIGHT))
-            .push(self.battery2.view(1, CHART_HEIGHT));
-        let col = Column::new()
-            .width(Length::Fill)
-            .height(Length::Shrink)
-            .align_items(Alignment::Center)
-            .push(control_row)
-            .push(row1)
-            .push(row2);
-
-        Scrollable::new(col).height(Length::Shrink).into()
+            .push(holding_text)
     }
 
     pub fn update_battery2(&mut self) {
@@ -233,4 +263,10 @@ impl AllCharts {
         ]
         .map(f);
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum SelectedTab {
+    VoltageCharts,
+    Modbus,
 }

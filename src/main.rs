@@ -1,4 +1,4 @@
-use all_charts::AllCharts;
+use all_charts::{AllCharts, SelectedTab};
 use iced::{
     executor, font,
     widget::{Column, Container},
@@ -59,6 +59,8 @@ pub enum Message {
     ReadHoldings { register_address: u16, size: u8 },
     ReadRegisters { register_address: u16, size: u8 },
     PauseUnpause,
+    TabSelected(i32),
+    ToggleChartControls,
 }
 
 struct State {
@@ -111,8 +113,9 @@ impl State {
                 self.charts.battery_pack.tick_len = tick_len;
                 self.charts.pv.tick_len = tick_len;
             }
-            RemoteData::Holdings(val) => self.charts.modbus_val = val,
-            RemoteData::InputRegisters(val) => self.charts.modbus_val = val,
+            RemoteData::Holdings(val) | RemoteData::InputRegisters(val) => {
+                self.charts.modbus_val = val
+            }
         }
         if bupdate_battery2 {
             self.charts.update_battery2();
@@ -199,6 +202,13 @@ impl Application for State {
                     size,
                 })
                 .expect("command_sender: could not send command"),
+            Message::TabSelected(ix) => match ix {
+                0 => self.charts.selected_tab = SelectedTab::VoltageCharts,
+                _ => self.charts.selected_tab = SelectedTab::Modbus,
+            },
+            Message::ToggleChartControls => {
+                self.charts.chart_controls = !self.charts.chart_controls
+            }
             Message::FontLoaded(_) => {}
         }
         self.charts.clear_caches();
