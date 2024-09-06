@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use crate::{
     time_interval::TimeInterval, tracer_an::two_bytes_to_f32, voltage_chart::VoltageChart, Message,
     CHART_HEIGHT,
@@ -23,6 +25,7 @@ pub struct AllCharts {
     pub modbus_val: Vec<u8>,
     pub chart_controls: bool,
     pub paused: bool,
+    pub connected: Arc<Mutex<bool>>,
 }
 
 impl Default for AllCharts {
@@ -60,6 +63,7 @@ impl Default for AllCharts {
             register_address: 0,
             register_address_string: String::new(),
             modbus_val: Vec::new(),
+            connected: Arc::new(Mutex::new(false)),
         }
     }
 }
@@ -70,10 +74,16 @@ impl AllCharts {
             .push(0, TabLabel::Text(String::from("Voltage Charts")))
             .push(1, TabLabel::Text(String::from("Modbus")));
 
-        let main_contents = match self.selected_tab {
+        let connected = *self.connected.lock().expect("could not lock mutex");
+        let mut main_contents = Column::new();
+        if !connected {
+            main_contents = main_contents.push(Text::new("No connection !!!").size(36));
+        }
+
+        main_contents = main_contents.push(match self.selected_tab {
             SelectedTab::VoltageCharts => self.view_charts(),
             SelectedTab::Modbus => self.view_modbus(),
-        };
+        });
         Scrollable::new(Column::new().push(tab_bar).push(main_contents))
             .height(Length::Shrink)
             .into()

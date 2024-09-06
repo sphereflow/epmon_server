@@ -27,6 +27,7 @@ pub const CHART_HEIGHT: f32 = 400.0;
 fn main() {
     let connected = Arc::new(Mutex::new(false));
     let connected_bc = connected.clone();
+    let connected_main_app = connected.clone();
     let (remote_data_sender, remote_data_receiver) = channel();
     let (command_sender, command_receiver) = channel();
 
@@ -35,7 +36,7 @@ fn main() {
         server_task::server_task(connected, remote_data_sender, command_receiver)
     });
     State::run(Settings {
-        flags: (remote_data_receiver, command_sender),
+        flags: (remote_data_receiver, command_sender, connected_main_app),
         id: Default::default(),
         window: Default::default(),
         fonts: Default::default(),
@@ -130,14 +131,21 @@ impl Application for State {
 
     type Theme = iced::Theme;
 
-    type Flags = (Receiver<RemoteData>, Sender<command::Command>);
+    type Flags = (
+        Receiver<RemoteData>,
+        Sender<command::Command>,
+        Arc<Mutex<bool>>,
+    );
 
     fn new(
-        (remote_data_receiver, command_sender): Self::Flags,
+        (remote_data_receiver, command_sender, connected): Self::Flags,
     ) -> (Self, iced::Command<Self::Message>) {
         (
             Self {
-                charts: Default::default(),
+                charts: AllCharts {
+                    connected,
+                    ..Default::default()
+                },
                 start_instant: Instant::now(),
                 voltage_buffer_size: 0,
                 remote_data_receiver,
