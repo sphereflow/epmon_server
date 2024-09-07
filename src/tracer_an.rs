@@ -64,14 +64,22 @@ impl Rated {
 impl Display for Rated {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Rated: \n")?;
-        writeln!(f, "rated pv voltage: {} V", self.array_rated_voltage)?;
-        writeln!(f, "rated pv current: {} A", self.array_rated_current)?;
-        writeln!(f, "rated pv power: {} W", self.array_rated_power)?;
-        writeln!(f, "rated battery voltage: {} V", self.battery_rated_voltage)?;
-        writeln!(f, "rated battery current: {} A", self.battery_rated_current)?;
-        writeln!(f, "rated battery power: {} W", self.battery_rated_power)?;
-        writeln!(f, "charging mode: {:?}", self.charging_mode)?;
-        writeln!(f, "rated load current: {} A", self.rated_current_load)
+        writeln!(f, "    rated pv voltage: {} V", self.array_rated_voltage)?;
+        writeln!(f, "    rated pv current: {} A", self.array_rated_current)?;
+        writeln!(f, "    rated pv power: {} W", self.array_rated_power)?;
+        writeln!(
+            f,
+            "    rated battery voltage: {} V",
+            self.battery_rated_voltage
+        )?;
+        writeln!(
+            f,
+            "    rated battery current: {} A",
+            self.battery_rated_current
+        )?;
+        writeln!(f, "    rated battery power: {} W", self.battery_rated_power)?;
+        writeln!(f, "    charging mode: {:?}", self.charging_mode)?;
+        writeln!(f, "    rated load current: {} A", self.rated_current_load)
     }
 }
 
@@ -160,36 +168,40 @@ impl Realtime {
 impl Display for Realtime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Realtime: \n")?;
-        writeln!(f, "pv voltage: {} V", self.pv_voltage)?;
-        writeln!(f, "pv current: {} A", self.pv_current)?;
-        writeln!(f, "pv power: {} W", self.pv_power)?;
-        writeln!(f, "battery power: {} W", self.battery_power)?;
-        writeln!(f, "load voltage: {} V", self.load_voltage)?;
-        writeln!(f, "load current: {} A", self.load_current)?;
-        writeln!(f, "load power: {} W", self.load_power)?;
-        writeln!(f, "battery temperature: {} C", self.battery_temperature)?;
+        writeln!(f, "    pv voltage: {} V", self.pv_voltage)?;
+        writeln!(f, "    pv current: {} A", self.pv_current)?;
+        writeln!(f, "    pv power: {} W", self.pv_power)?;
+        writeln!(f, "    battery power: {} W", self.battery_power)?;
+        writeln!(f, "    load voltage: {} V", self.load_voltage)?;
+        writeln!(f, "    load current: {} A", self.load_current)?;
+        writeln!(f, "    load power: {} W", self.load_power)?;
+        writeln!(f, "    battery temperature: {} C", self.battery_temperature)?;
         writeln!(
             f,
-            "remote battery temperature: {} C",
+            "    remote battery temperature: {} C",
             self.remote_battery_temperature
         )?;
-        writeln!(f, "equipment temperature: {} C", self.equipment_temperature)?;
         writeln!(
             f,
-            "remaining battery capacity: {} %",
+            "    equipment temperature: {} C",
+            self.equipment_temperature
+        )?;
+        writeln!(
+            f,
+            "    remaining battery capacity: {} %",
             self.remaining_battery_capacity
         )?;
         writeln!(
             f,
-            "battery real rated power: {} V",
+            "    battery real rated power: {} V",
             self.battery_real_rated_power
         )
     }
 }
 
 // [b0, b1, b2, b3] => u32 => f32 => / 100
-fn four_bytes_to_f32(bytes: [u8; 4]) -> f32 {
-    let integer: u32 = u32::from_be_bytes(bytes);
+fn four_bytes_to_f32([b0, b1, b2, b3]: [u8; 4]) -> f32 {
+    let integer: u32 = u32::from_be_bytes([b2, b3, b0, b1]);
     (integer as f32) / 100.0
 }
 
@@ -236,7 +248,7 @@ impl RealtimeStatus {
 
 impl Display for RealtimeStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "realtime status:")?;
+        writeln!(f, "realtime status :")?;
         write!(f, "{}", self.battery_status)?;
         write!(f, "{}", self.charging_equipment_status)?;
         write!(f, "{}", self.discharging_equipment_status)
@@ -260,28 +272,28 @@ impl Display for BatteryStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "battery voltage status: {:?}",
+            "    battery voltage status: {:?}",
             BatteryVoltageStatus::from(*self)
         )?;
         writeln!(
             f,
-            "battery temperature status: {:?}",
+            "    battery temperature status: {:?}",
             BatteryTemperatureStatus::from(*self)
         )?;
         if self.is_inner_resistance_abnormal() {
-            writeln!(f, "inner resistance is abnormal")?;
+            writeln!(f, "    inner resistance is abnormal")?;
         } else {
-            writeln!(f, "inner resistance is normal")?;
+            writeln!(f, "    inner resistance is normal")?;
         }
         if self.is_wrong_rated_voltage() {
             writeln!(
                 f,
-                "rated battery voltage differs from actual battery voltage"
+                "    rated battery voltage differs from actual battery voltage"
             )
         } else {
             writeln!(
                 f,
-                "rated battery voltage and actual battery voltage are in line"
+                "    rated battery voltage and actual battery voltage are in line"
             )
         }
     }
@@ -382,40 +394,40 @@ impl ChargingEquipmentStatus {
 
 impl Display for ChargingEquipmentStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "charging equipment status:")?;
+        writeln!(f, "charging equipment status :")?;
         if self.is_running() {
-            writeln!(f, "running")?;
+            writeln!(f, "    running")?;
         } else {
-            writeln!(f, "on standby")?;
+            writeln!(f, "    on standby")?;
         }
-        writeln!(f, "{:?}", ChargingStatus::from(*self))?;
-        writeln!(f, "{:?}", InputVoltStatus::from(*self))?;
+        writeln!(f, "    {}", ChargingStatus::from(*self))?;
+        writeln!(f, "    {}", InputVoltStatus::from(*self))?;
         if self.has_fault() {
-            writeln!(f, "fault detected")?;
+            writeln!(f, "    fault detected")?;
         }
         if self.is_pv_input_short() {
-            writeln!(f, "pv input is shorted")?;
+            writeln!(f, "    pv input is shorted")?;
         }
         if self.is_load_mosfet_short() {
-            writeln!(f, "load MOSFET is shorted")?;
+            writeln!(f, "    load MOSFET is shorted")?;
         }
         if self.is_load_short() {
-            writeln!(f, "load is shorted")?;
+            writeln!(f, "    load is shorted")?;
         }
         if self.is_load_over_current() {
-            writeln!(f, "load overcurrent detected")?;
+            writeln!(f, "    load overcurrent detected")?;
         }
         if self.is_input_over_current() {
-            writeln!(f, "input overcurrent detected")?;
+            writeln!(f, "    input overcurrent detected")?;
         }
         if self.is_anti_reverse_mosfet_short() {
-            writeln!(f, "anti reverse MOSFET is shorted")?;
+            writeln!(f, "    anti reverse MOSFET is shorted")?;
         }
         if self.is_charging_or_anti_reverse_mosfet_short() {
-            writeln!(f, "charging or anti reverse MOSFET is shorted")?;
+            writeln!(f, "    charging or anti reverse MOSFET is shorted")?;
         }
         if self.is_charging_mosfet_short() {
-            writeln!(f, "charging MOSFET is shorted")?;
+            writeln!(f, "    charging MOSFET is shorted")?;
         }
         Ok(())
     }
@@ -440,6 +452,12 @@ impl From<ChargingEquipmentStatus> for ChargingStatus {
     }
 }
 
+impl Display for ChargingStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChargingStatus::{:?}", self)
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum InputVoltStatus {
     Normal,
@@ -456,6 +474,12 @@ impl From<ChargingEquipmentStatus> for InputVoltStatus {
             2 => InputVoltStatus::HigherVoltInput,
             _ => InputVoltStatus::Error,
         }
+    }
+}
+
+impl Display for InputVoltStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InputVoltStatus::{:?}", self)
     }
 }
 
@@ -514,41 +538,41 @@ impl DischargingEquipmentStatus {
 
 impl Display for DischargingEquipmentStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "discharging equipment status")?;
+        writeln!(f, "discharging equipment status :")?;
         if self.is_running() {
-            writeln!(f, "status: running")?;
+            writeln!(f, "    status: running")?;
         } else {
-            writeln!(f, "status: on standby")?;
+            writeln!(f, "    status: on standby")?;
         }
         if self.has_fault() {
-            writeln!(f, "fault detected")?;
+            writeln!(f, "    fault detected")?;
         }
         if self.is_output_overpressure() {
-            writeln!(f, "output overpressure")?;
+            writeln!(f, "    output overpressure")?;
         }
         if self.is_boost_overpressure() {
-            writeln!(f, "boost overpressure")?;
+            writeln!(f, "    boost overpressure")?;
         }
         if self.is_high_voltage_side_short_circuit() {
-            writeln!(f, "high voltage side short circuit detected")?;
+            writeln!(f, "    high voltage side short circuit detected")?;
         }
         if self.is_input_over_pressure() {
-            writeln!(f, "input overpressure")?;
+            writeln!(f, "    input overpressure")?;
         }
         if self.is_output_voltage_abnormal() {
-            writeln!(f, "abnormal output voltage")?;
+            writeln!(f, "    abnormal output voltage")?;
         }
         if self.is_unable_to_stop_discharging() {
-            writeln!(f, "unable to stop discharging")?;
+            writeln!(f, "    unable to stop discharging")?;
         }
         if self.is_unable_to_discharge() {
-            writeln!(f, "unable to discharge")?;
+            writeln!(f, "    unable to discharge")?;
         }
         if self.is_short_circuit() {
-            writeln!(f, "short circuit detected")?;
+            writeln!(f, "    short circuit detected")?;
         }
-        writeln!(f, "output power status: {:?}", OutputPower::from(*self))?;
-        writeln!(f, "discharge status: {:?}", DischargeStatus::from(*self))?;
+        writeln!(f, "    {}", OutputPower::from(*self))?;
+        writeln!(f, "    {}", DischargeStatus::from(*self))?;
         Ok(())
     }
 }
@@ -572,6 +596,12 @@ impl From<DischargingEquipmentStatus> for OutputPower {
     }
 }
 
+impl Display for OutputPower {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OutputPower::{:?}", self)
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum DischargeStatus {
     Normal,
@@ -591,12 +621,117 @@ impl From<DischargingEquipmentStatus> for DischargeStatus {
     }
 }
 
+impl Display for DischargeStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DischargeStatus::{:?}", self)
+    }
+}
+
 pub const STATS_BASE_ADDRESS: u16 = 0x3300;
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct Stats {}
 
-pub const SETTINGS_BASE_ADDRESS: u16 = 0x9000;
-
-#[derive(Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct Settings {}
+
+pub const VOLTAGE_SETTINGS_BASE_ADDRESS: u16 = 0x9000;
+
+#[derive(Default, Debug, Copy, Clone)]
+pub struct VoltageSettings {
+    pub battery_type: BatteryType,
+    pub battery_capacity: u16,
+    pub temperature_compensation_coefficient: u16,
+    pub over_voltage_disconnect: f32,
+    pub charging_limit_voltage: f32,
+    pub over_voltage_reconnect: f32,
+    pub equalization_voltage: f32,
+    pub boost_voltage: f32,
+    pub float_voltage: f32,
+    pub boost_reconnect_voltage: f32,
+    pub low_voltage_reconnect_voltage: f32,
+    pub under_voltage_recover_voltage: f32,
+    pub under_voltage_warning_voltage: f32,
+    pub low_voltage_disconnect_voltage: f32,
+    pub discharging_limit_voltage: f32,
+}
+
+impl VoltageSettings {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        assert!(bytes.len() >= VoltageSettings::data_len());
+        VoltageSettings {
+            battery_type: BatteryType::from(u16::from_be_bytes([bytes[0], bytes[1]])),
+            battery_capacity: u16::from_be_bytes([bytes[2], bytes[3]]),
+            temperature_compensation_coefficient: u16::from_be_bytes([bytes[4], bytes[5]]),
+            over_voltage_disconnect: two_bytes_to_f32([bytes[6], bytes[7]]),
+            charging_limit_voltage: two_bytes_to_f32([bytes[8], bytes[9]]),
+            over_voltage_reconnect: two_bytes_to_f32([bytes[10], bytes[11]]),
+            equalization_voltage: two_bytes_to_f32([bytes[12], bytes[13]]),
+            boost_voltage: two_bytes_to_f32([bytes[14], bytes[15]]),
+            float_voltage: two_bytes_to_f32([bytes[16], bytes[17]]),
+            boost_reconnect_voltage: two_bytes_to_f32([bytes[18], bytes[19]]),
+            low_voltage_reconnect_voltage: two_bytes_to_f32([bytes[20], bytes[21]]),
+            under_voltage_recover_voltage: two_bytes_to_f32([bytes[22], bytes[23]]),
+            under_voltage_warning_voltage: two_bytes_to_f32([bytes[24], bytes[25]]),
+            low_voltage_disconnect_voltage: two_bytes_to_f32([bytes[26], bytes[27]]),
+            discharging_limit_voltage: two_bytes_to_f32([bytes[28], bytes[29]]),
+        }
+    }
+
+    pub fn data_len() -> usize {
+        30
+    }
+
+    pub fn generate_get_command() -> Command {
+        Command::ModbusGetHoldings {
+            register_address: VOLTAGE_SETTINGS_BASE_ADDRESS,
+            size: 15,
+        }
+    }
+
+    pub fn check_settings_lifepo4(&self) -> bool {
+        let c0 = self.battery_type == BatteryType::UserDefined;
+        let c1 = self.over_voltage_disconnect > self.over_voltage_reconnect;
+        let c2 = self.over_voltage_reconnect == self.charging_limit_voltage;
+        let c3 = self.charging_limit_voltage >= self.equalization_voltage;
+        let c4 = self.equalization_voltage == self.boost_voltage;
+        let c5 = self.boost_voltage >= self.float_voltage;
+        let c6 = self.float_voltage > self.boost_reconnect_voltage;
+        let c7 = self.boost_reconnect_voltage > self.low_voltage_reconnect_voltage;
+        let c8 = self.low_voltage_reconnect_voltage > self.low_voltage_disconnect_voltage;
+        let c9 = self.low_voltage_disconnect_voltage >= self.discharging_limit_voltage;
+        let c10 = self.under_voltage_recover_voltage > self.under_voltage_warning_voltage;
+        let c11 = self.under_voltage_warning_voltage >= self.discharging_limit_voltage;
+        let c12 = self.low_voltage_disconnect_voltage >= self.discharging_limit_voltage + 0.2;
+        let c13 = self.over_voltage_disconnect > self.charging_limit_voltage + 0.2;
+        c0 && c1 && c2 && c3 && c4 && c5 && c6 && c7 && c8 && c9 && c10 && c11 && c12 && c13
+    }
+}
+
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
+pub enum BatteryType {
+    #[default]
+    UserDefined,
+    Sealed,
+    Gel,
+    Flooded,
+    OutOfBounds,
+}
+
+impl From<u16> for BatteryType {
+    fn from(value: u16) -> Self {
+        match value {
+            0 => Self::UserDefined,
+            1 => Self::Sealed,
+            2 => Self::Gel,
+            3 => Self::Flooded,
+            _ => Self::OutOfBounds,
+        }
+    }
+}
+
+impl Display for BatteryType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BatteryType::{:?}", self)
+    }
+}

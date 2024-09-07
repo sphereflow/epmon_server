@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     time_interval::TimeInterval,
-    tracer_an::{two_bytes_to_f32, Realtime, RealtimeStatus},
+    tracer_an::{two_bytes_to_f32, Realtime, RealtimeStatus, VoltageSettings},
     voltage_chart::VoltageChart,
     Message, CHART_HEIGHT,
 };
@@ -28,6 +28,7 @@ pub struct AllCharts {
     pub interpret_bytes_as: InterpretBytesAs,
     pub realtime_data: Realtime,
     pub realtime_status_data: RealtimeStatus,
+    pub voltage_settings: VoltageSettings,
     pub chart_controls: bool,
     pub paused: bool,
     pub connected: Arc<Mutex<bool>>,
@@ -70,6 +71,7 @@ impl Default for AllCharts {
             modbus_val: Vec::new(),
             realtime_data: Default::default(),
             realtime_status_data: Default::default(),
+            voltage_settings: Default::default(),
             interpret_bytes_as: InterpretBytesAs::Holding,
             connected: Arc::new(Mutex::new(false)),
         }
@@ -97,7 +99,7 @@ impl AllCharts {
             .into()
     }
 
-    fn view_charts(&self) -> Column<Message> {
+    fn view_charts(&self) -> Element<Message> {
         let control_row = self.view_chart_controls();
         let row1 = Row::new()
             .spacing(15)
@@ -123,6 +125,7 @@ impl AllCharts {
             .push(control_row)
             .push(row1)
             .push(row2)
+            .into()
     }
 
     fn view_chart_controls(&self) -> Row<Message> {
@@ -207,11 +210,12 @@ impl AllCharts {
         }
     }
 
-    fn view_modbus(&self) -> Column<Message> {
+    fn view_modbus(&self) -> Element<Message> {
         let register_text_input = text_input(
             "enter register address of holding",
             &self.register_address_string,
         )
+        .width(140)
         .on_input(Message::AddressInput);
         let holding_button = Button::new("get holding val").on_press(Message::ReadHoldings {
             register_address: self.register_address,
@@ -237,16 +241,84 @@ impl AllCharts {
         };
         let realtime_text = text(format!("{}", self.realtime_data));
         let realtime_status_text = text(format!("{}", self.realtime_status_data));
-        Column::new()
+        let register_col = Column::new()
             .push(register_text_input)
+            .push(spacer())
             .push(holding_button)
             .push(register_button)
-            .push(read_realtime_button)
-            .push(read_realtime_status_button)
+            .push(spacer())
             .push(register_numeric_text)
-            .push(holding_text)
-            .push(realtime_text)
-            .push(realtime_status_text)
+            .push(holding_text);
+        let realtime_col = Column::new().push(read_realtime_button).push(realtime_text);
+        let realtime_status_col = Column::new()
+            .push(read_realtime_status_button)
+            .push(realtime_status_text);
+        let row1 = Row::new()
+            .push(spacer())
+            .push(register_col)
+            .push(spacer())
+            .push(realtime_col)
+            .push(spacer())
+            .push(realtime_status_col)
+            .push(spacer());
+        let row2 = Row::new().push(self.view_settings());
+        Column::new().push(spacer()).push(row1).push(row2).into()
+    }
+
+    fn view_settings(&self) -> Element<Message> {
+        Row::new()
+            .push(spacer())
+            .push(self.view_voltage_settings())
+            .into()
+    }
+
+    fn view_voltage_settings(&self) -> Element<Message> {
+        let s = self.voltage_settings;
+        let get_voltage_settings_button =
+            Button::new("get voltage settings").on_press(Message::ReadVoltageSettings);
+        let set_buttons_col = Column::new()
+            .push(Space::new(1, 4))
+            .push(Button::new("set battery type"))
+            .push(Button::new("set over voltage disconnect"))
+            .push(Button::new("set charging limit voltage"))
+            .push(Button::new("set over voltage reconnect"))
+            .push(Button::new("set equalization voltage"))
+            .push(Button::new("set boost voltage"))
+            .push(Button::new("set float voltage"))
+            .push(Button::new("set boost reconnect voltage"))
+            .push(Button::new("set low voltage reconnect"))
+            .push(Button::new("set under voltage recover"))
+            .push(Button::new("set under voltage warning"))
+            .push(Button::new("set low voltage disconnect"))
+            .push(Button::new("set discharging limit voltage"));
+        let display_voltage_settings_col = Column::new()
+            .push(Space::new(1, 0.))
+            .push(Text::new(format!("{}", s.battery_type)))
+            .push(Text::new(format!("{}", s.over_voltage_disconnect)))
+            .push(Text::new(format!("{}", s.charging_limit_voltage)))
+            .push(Text::new(format!("{}", s.over_voltage_reconnect)))
+            .push(Text::new(format!("{}", s.equalization_voltage)))
+            .push(Text::new(format!("{}", s.boost_voltage)))
+            .push(Text::new(format!("{}", s.float_voltage)))
+            .push(Text::new(format!("{}", s.boost_reconnect_voltage)))
+            .push(Text::new(format!("{}", s.low_voltage_reconnect_voltage)))
+            .push(Text::new(format!("{}", s.under_voltage_recover_voltage)))
+            .push(Text::new(format!("{}", s.under_voltage_warning_voltage)))
+            .push(Text::new(format!("{}", s.low_voltage_disconnect_voltage)))
+            .push(Text::new(format!("{}", s.discharging_limit_voltage)))
+            .spacing(10);
+        let voltage_settings_input_col = Column::new();
+        let row = Row::new()
+            .push(set_buttons_col)
+            .push(spacer())
+            .push(display_voltage_settings_col)
+            .push(spacer())
+            .push(voltage_settings_input_col);
+        Column::new()
+            .push(spacer())
+            .push(get_voltage_settings_button)
+            .push(row)
+            .into()
     }
 
     pub fn update_battery2(&mut self) {
@@ -304,6 +376,11 @@ pub enum SelectedTab {
 pub enum InterpretBytesAs {
     Realtime,
     RealtimeStatus,
+    VoltageSettings,
     Holding,
     InputRegister,
+}
+
+fn spacer() -> Space {
+    Space::new(30, 30)
 }

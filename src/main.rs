@@ -11,7 +11,7 @@ use std::{
     time::Instant,
 };
 use time_interval::TimeInterval;
-use tracer_an::{Realtime, RealtimeStatus};
+use tracer_an::{Realtime, RealtimeStatus, VoltageSettings};
 use udp_broadcast_task::udp_broadcast;
 
 pub mod all_charts;
@@ -65,6 +65,7 @@ pub enum Message {
     PauseUnpause,
     TabSelected(i32),
     ToggleChartControls,
+    ReadVoltageSettings,
 }
 
 struct State {
@@ -132,6 +133,14 @@ impl State {
                         if self.charts.modbus_val.len() >= RealtimeStatus::data_len() {
                             self.charts.realtime_status_data =
                                 RealtimeStatus::from_bytes(&self.charts.modbus_val);
+                            self.charts.modbus_val.clear();
+                        }
+                    }
+                    InterpretBytesAs::VoltageSettings => {
+                        self.charts.modbus_val.extend_from_slice(&val);
+                        if self.charts.modbus_val.len() >= VoltageSettings::data_len() {
+                            self.charts.voltage_settings =
+                                VoltageSettings::from_bytes(&self.charts.modbus_val);
                             self.charts.modbus_val.clear();
                         }
                     }
@@ -250,6 +259,13 @@ impl Application for State {
                 self.charts.interpret_bytes_as = InterpretBytesAs::RealtimeStatus;
                 self.command_sender
                     .send(RealtimeStatus::generate_command())
+                    .expect("command sender: could not send command");
+            }
+            Message::ReadVoltageSettings => {
+                self.charts.modbus_val.clear();
+                self.charts.interpret_bytes_as = InterpretBytesAs::VoltageSettings;
+                self.command_sender
+                    .send(VoltageSettings::generate_get_command())
                     .expect("command sender: could not send command");
             }
             Message::TabSelected(ix) => match ix {
