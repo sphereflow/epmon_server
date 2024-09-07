@@ -136,7 +136,7 @@ impl RemoteData {
         tcp_stream.write_all(&command.to_bytes())?;
         let mut read_buf = vec![0; (command.size() * 2) as usize];
         tcp_stream.read_exact(&mut read_buf)?;
-        Ok(Self::Realtime(Realtime::from_bytes(&read_buf)))
+        Ok(Self::RealtimeStatus(RealtimeStatus::from_bytes(&read_buf)))
     }
 
     pub fn read_voltage_settings(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
@@ -144,7 +144,9 @@ impl RemoteData {
         tcp_stream.write_all(&command.to_bytes())?;
         let mut read_buf = vec![0; (command.size() * 2) as usize];
         tcp_stream.read_exact(&mut read_buf)?;
-        Ok(Self::Realtime(Realtime::from_bytes(&read_buf)))
+        Ok(Self::VoltageSettings(VoltageSettings::from_bytes(
+            &read_buf,
+        )))
     }
 
     pub fn take_adc_readings(&mut self) -> Vec<u16> {
