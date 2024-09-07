@@ -1,8 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    time_interval::TimeInterval, tracer_an::two_bytes_to_f32, voltage_chart::VoltageChart, Message,
-    CHART_HEIGHT,
+    time_interval::TimeInterval,
+    tracer_an::{two_bytes_to_f32, Realtime, RealtimeStatus},
+    voltage_chart::VoltageChart,
+    Message, CHART_HEIGHT,
 };
 use iced::{widget::*, Alignment, Element, Length};
 use iced_aw::{TabBar, TabLabel};
@@ -23,6 +25,9 @@ pub struct AllCharts {
     pub register_address_string: String,
     pub register_address: u16,
     pub modbus_val: Vec<u8>,
+    pub interpret_bytes_as: InterpretBytesAs,
+    pub realtime_data: Realtime,
+    pub realtime_status_data: RealtimeStatus,
     pub chart_controls: bool,
     pub paused: bool,
     pub connected: Arc<Mutex<bool>>,
@@ -63,6 +68,9 @@ impl Default for AllCharts {
             register_address: 0,
             register_address_string: String::new(),
             modbus_val: Vec::new(),
+            realtime_data: Default::default(),
+            realtime_status_data: Default::default(),
+            interpret_bytes_as: InterpretBytesAs::Holding,
             connected: Arc::new(Mutex::new(false)),
         }
     }
@@ -198,6 +206,7 @@ impl AllCharts {
             control_row.push(toggle_chart_controls)
         }
     }
+
     fn view_modbus(&self) -> Column<Message> {
         let register_text_input = text_input(
             "enter register address of holding",
@@ -212,6 +221,10 @@ impl AllCharts {
             register_address: self.register_address,
             size: 1,
         });
+        let read_realtime_button =
+            Button::new("read realtime data").on_press(Message::ReadRealtime);
+        let read_realtime_status_button =
+            Button::new("read realtime status data").on_press(Message::ReadRealtimeStatus);
         let register_numeric_text =
             text(format!("numeric register value: {}", self.register_address));
         let holding_text = if self.modbus_val.len() >= 2 {
@@ -222,12 +235,18 @@ impl AllCharts {
         } else {
             text("no value")
         };
+        let realtime_text = text(format!("{}", self.realtime_data));
+        let realtime_status_text = text(format!("{}", self.realtime_status_data));
         Column::new()
             .push(register_text_input)
             .push(holding_button)
             .push(register_button)
+            .push(read_realtime_button)
+            .push(read_realtime_status_button)
             .push(register_numeric_text)
             .push(holding_text)
+            .push(realtime_text)
+            .push(realtime_status_text)
     }
 
     pub fn update_battery2(&mut self) {
@@ -279,4 +298,12 @@ impl AllCharts {
 pub enum SelectedTab {
     VoltageCharts,
     Modbus,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum InterpretBytesAs {
+    Realtime,
+    RealtimeStatus,
+    Holding,
+    InputRegister,
 }

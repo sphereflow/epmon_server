@@ -78,6 +78,7 @@ pub fn server_task(
                 while let Ok(command) = command_receiver.try_recv() {
                     if let command::Command::ModbusGetHoldings { .. } = command {
                         if let Ok(val) = RemoteData::get_holdings(&mut tcp_stream, command) {
+                            println!("holding val: {:?}", &val);
                             remote_data_sender.send(val).unwrap();
                         } else {
                             if let Ok(mut mgc) = connected.lock() {
@@ -89,7 +90,7 @@ pub fn server_task(
                     if let command::Command::ModbusGetInputRegisters { .. } = command {
                         println!("getting_input_registers");
                         if let Ok(val) = RemoteData::get_input_registers(&mut tcp_stream, command) {
-                            println!("Input reg val: {:?}", &val);
+                            println!("input reg val: {:?}", &val);
                             remote_data_sender.send(val).unwrap();
                         } else {
                             if let Ok(mut mgc) = connected.lock() {

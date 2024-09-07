@@ -1,4 +1,4 @@
-use all_charts::{AllCharts, SelectedTab};
+use all_charts::{AllCharts, InterpretBytesAs, SelectedTab};
 use iced::{
     executor, font,
     widget::{Column, Container},
@@ -11,6 +11,7 @@ use std::{
     time::Instant,
 };
 use time_interval::TimeInterval;
+use tracer_an::{Realtime, RealtimeStatus};
 use udp_broadcast_task::udp_broadcast;
 
 pub mod all_charts;
@@ -59,6 +60,8 @@ pub enum Message {
     AddressInput(String),
     ReadHoldings { register_address: u16, size: u8 },
     ReadRegisters { register_address: u16, size: u8 },
+    ReadRealtime,
+    ReadRealtimeStatus,
     PauseUnpause,
     TabSelected(i32),
     ToggleChartControls,
@@ -115,7 +118,26 @@ impl State {
                 self.charts.pv.tick_len = tick_len;
             }
             RemoteData::Holdings(val) | RemoteData::InputRegisters(val) => {
-                self.charts.modbus_val = val
+                match self.charts.interpret_bytes_as {
+                    InterpretBytesAs::Realtime => {
+                        self.charts.modbus_val.extend_from_slice(&val);
+                        if self.charts.modbus_val.len() >= Realtime::data_len() {
+                            self.charts.realtime_data =
+                                Realtime::from_bytes(&self.charts.modbus_val);
+                            self.charts.modbus_val.clear();
+                        }
+                    }
+                    InterpretBytesAs::RealtimeStatus => {
+                        self.charts.modbus_val.extend_from_slice(&val);
+                        if self.charts.modbus_val.len() >= RealtimeStatus::data_len() {
+                            self.charts.realtime_status_data =
+                                RealtimeStatus::from_bytes(&self.charts.modbus_val);
+                            self.charts.modbus_val.clear();
+                        }
+                    }
+                    InterpretBytesAs::Holding => self.charts.modbus_val = val,
+                    InterpretBytesAs::InputRegister => self.charts.modbus_val = val,
+                }
             }
         }
         if bupdate_battery2 {
@@ -193,23 +215,43 @@ impl Application for State {
             Message::ReadHoldings {
                 register_address,
                 size,
-            } => self
-                .command_sender
-                .send(command::Command::ModbusGetHoldings {
-                    register_address,
-                    size,
-                })
-                .expect("command_sender: could not send command"),
+            } => {
+                self.command_sender
+                    .send(command::Command::ModbusGetHoldings {
+                        register_address,
+                        size,
+                    })
+                    .expect("command_sender: could not send command");
+                self.charts.interpret_bytes_as = InterpretBytesAs::Holding;
+            }
             Message::ReadRegisters {
                 register_address,
                 size,
-            } => self
-                .command_sender
-                .send(command::Command::ModbusGetInputRegisters {
-                    register_address,
-                    size,
-                })
-                .expect("command_sender: could not send command"),
+            } => {
+                self.command_sender
+                    .send(command::Command::ModbusGetInputRegisters {
+                        register_address,
+                        size,
+                    })
+                    .expect("command_sender: could not send command");
+                self.charts.interpret_bytes_as = InterpretBytesAs::InputRegister;
+            }
+            Message::ReadRealtime => {
+                self.charts.modbus_val.clear();
+                self.charts.interpret_bytes_as = InterpretBytesAs::Realtime;
+                for command in Realtime::generate_commands() {
+                    self.command_sender
+                        .send(command)
+                        .expect("command sender: could not send command");
+                }
+            }
+            Message::ReadRealtimeStatus => {
+                self.charts.modbus_val.clear();
+                self.charts.interpret_bytes_as = InterpretBytesAs::RealtimeStatus;
+                self.command_sender
+                    .send(RealtimeStatus::generate_command())
+                    .expect("command sender: could not send command");
+            }
             Message::TabSelected(ix) => match ix {
                 0 => self.charts.selected_tab = SelectedTab::VoltageCharts,
                 _ => self.charts.selected_tab = SelectedTab::Modbus,
