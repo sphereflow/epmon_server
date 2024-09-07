@@ -25,7 +25,6 @@ pub struct AllCharts {
     pub register_address_string: String,
     pub register_address: u16,
     pub modbus_val: Vec<u8>,
-    pub interpret_bytes_as: InterpretBytesAs,
     pub realtime_data: Realtime,
     pub realtime_status_data: RealtimeStatus,
     pub voltage_settings: VoltageSettings,
@@ -72,7 +71,6 @@ impl Default for AllCharts {
             realtime_data: Default::default(),
             realtime_status_data: Default::default(),
             voltage_settings: Default::default(),
-            interpret_bytes_as: InterpretBytesAs::Holding,
             connected: Arc::new(Mutex::new(false)),
         }
     }
@@ -370,15 +368,6 @@ impl AllCharts {
 pub enum SelectedTab {
     VoltageCharts,
     Modbus,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum InterpretBytesAs {
-    Realtime,
-    RealtimeStatus,
-    VoltageSettings,
-    Holding,
-    InputRegister,
 }
 
 fn spacer() -> Space {

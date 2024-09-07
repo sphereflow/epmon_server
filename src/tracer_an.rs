@@ -93,7 +93,7 @@ pub enum ChargingMode {
 
 pub const REALTIME_BASE_ADDRESS: u16 = 0x3100;
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct Realtime {
     pv_voltage: f32,
     pv_current: f32,
@@ -213,7 +213,7 @@ pub fn two_bytes_to_f32(bytes: [u8; 2]) -> f32 {
 
 pub const REALTIME_STATUS_BASE_ADDRESS: u16 = 0x3200;
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct RealtimeStatus {
     battery_status: BatteryStatus,
     charging_equipment_status: ChargingEquipmentStatus,
@@ -255,7 +255,7 @@ impl Display for RealtimeStatus {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct BatteryStatus(u16);
 
 impl BatteryStatus {
@@ -339,7 +339,7 @@ impl From<BatteryStatus> for BatteryTemperatureStatus {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct ChargingEquipmentStatus(u16);
 
 impl ChargingEquipmentStatus {
@@ -483,7 +483,7 @@ impl Display for InputVoltStatus {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct DischargingEquipmentStatus(u16);
 
 impl DischargingEquipmentStatus {
@@ -637,7 +637,7 @@ pub struct Settings {}
 
 pub const VOLTAGE_SETTINGS_BASE_ADDRESS: u16 = 0x9000;
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct VoltageSettings {
     pub battery_type: BatteryType,
     pub battery_capacity: u16,

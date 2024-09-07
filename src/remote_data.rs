@@ -3,7 +3,10 @@ use std::{
     net::TcpStream,
 };
 
-use crate::command;
+use crate::{
+    command,
+    tracer_an::{Realtime, RealtimeStatus, VoltageSettings},
+};
 
 #[derive(PartialEq, Debug, Clone, Default)]
 pub enum RemoteData {
@@ -16,6 +19,9 @@ pub enum RemoteData {
     Intervalms(u16),
     Holdings(Vec<u8>),
     InputRegisters(Vec<u8>),
+    Realtime(Realtime),
+    RealtimeStatus(RealtimeStatus),
+    VoltageSettings(VoltageSettings),
 }
 
 impl RemoteData {
@@ -110,6 +116,35 @@ impl RemoteData {
         } else {
             Err(ErrorKind::InvalidInput.into())
         }
+    }
+
+    pub fn read_realtime(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
+        let mut write_buf;
+        let mut bytes = Vec::new();
+        for command in Realtime::generate_commands() {
+            write_buf = command.to_bytes();
+            tcp_stream.write_all(&write_buf)?;
+            let mut read_buf = vec![0; (command.size() * 2) as usize];
+            tcp_stream.read_exact(&mut read_buf)?;
+            bytes.extend_from_slice(&read_buf[..]);
+        }
+        Ok(Self::Realtime(Realtime::from_bytes(&bytes)))
+    }
+
+    pub fn read_realtime_status(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
+        let command = RealtimeStatus::generate_command();
+        tcp_stream.write_all(&command.to_bytes())?;
+        let mut read_buf = vec![0; (command.size() * 2) as usize];
+        tcp_stream.read_exact(&mut read_buf)?;
+        Ok(Self::Realtime(Realtime::from_bytes(&read_buf)))
+    }
+
+    pub fn read_voltage_settings(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
+        let command = VoltageSettings::generate_get_command();
+        tcp_stream.write_all(&command.to_bytes())?;
+        let mut read_buf = vec![0; (command.size() * 2) as usize];
+        tcp_stream.read_exact(&mut read_buf)?;
+        Ok(Self::Realtime(Realtime::from_bytes(&read_buf)))
     }
 
     pub fn take_adc_readings(&mut self) -> Vec<u16> {

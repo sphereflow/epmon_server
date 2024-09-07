@@ -1,17 +1,18 @@
-use all_charts::{AllCharts, InterpretBytesAs, SelectedTab};
+use all_charts::{AllCharts, SelectedTab};
+use command::Command;
 use iced::{
     executor, font,
     widget::{Column, Container},
-    Alignment, Application, Command, Length, Settings, Subscription,
+    Alignment, Application, Length, Settings, Subscription,
 };
 use remote_data::RemoteData;
+use server_task::ServerMessage;
 use std::{
     sync::{mpsc::*, Arc, Mutex},
     thread,
     time::Instant,
 };
 use time_interval::TimeInterval;
-use tracer_an::{Realtime, RealtimeStatus, VoltageSettings};
 use udp_broadcast_task::udp_broadcast;
 
 pub mod all_charts;
@@ -73,7 +74,7 @@ struct State {
     start_instant: Instant,
     voltage_buffer_size: usize,
     remote_data_receiver: Receiver<RemoteData>,
-    command_sender: Sender<command::Command>,
+    server_message_sender: Sender<ServerMessage>,
 }
 
 impl State {
@@ -119,34 +120,14 @@ impl State {
                 self.charts.pv.tick_len = tick_len;
             }
             RemoteData::Holdings(val) | RemoteData::InputRegisters(val) => {
-                match self.charts.interpret_bytes_as {
-                    InterpretBytesAs::Realtime => {
-                        self.charts.modbus_val.extend_from_slice(&val);
-                        if self.charts.modbus_val.len() >= Realtime::data_len() {
-                            self.charts.realtime_data =
-                                Realtime::from_bytes(&self.charts.modbus_val);
-                            self.charts.modbus_val.clear();
-                        }
-                    }
-                    InterpretBytesAs::RealtimeStatus => {
-                        self.charts.modbus_val.extend_from_slice(&val);
-                        if self.charts.modbus_val.len() >= RealtimeStatus::data_len() {
-                            self.charts.realtime_status_data =
-                                RealtimeStatus::from_bytes(&self.charts.modbus_val);
-                            self.charts.modbus_val.clear();
-                        }
-                    }
-                    InterpretBytesAs::VoltageSettings => {
-                        self.charts.modbus_val.extend_from_slice(&val);
-                        if self.charts.modbus_val.len() >= VoltageSettings::data_len() {
-                            self.charts.voltage_settings =
-                                VoltageSettings::from_bytes(&self.charts.modbus_val);
-                            self.charts.modbus_val.clear();
-                        }
-                    }
-                    InterpretBytesAs::Holding => self.charts.modbus_val = val,
-                    InterpretBytesAs::InputRegister => self.charts.modbus_val = val,
-                }
+                self.charts.modbus_val = val;
+            }
+            RemoteData::Realtime(realtime) => self.charts.realtime_data = realtime,
+            RemoteData::RealtimeStatus(realtime_status) => {
+                self.charts.realtime_status_data = realtime_status
+            }
+            RemoteData::VoltageSettings(voltage_settings) => {
+                self.charts.voltage_settings = voltage_settings
             }
         }
         if bupdate_battery2 {
@@ -164,7 +145,7 @@ impl Application for State {
 
     type Flags = (
         Receiver<RemoteData>,
-        Sender<command::Command>,
+        Sender<ServerMessage>,
         Arc<Mutex<bool>>,
     );
 
@@ -180,7 +161,7 @@ impl Application for State {
                 start_instant: Instant::now(),
                 voltage_buffer_size: 0,
                 remote_data_receiver,
-                command_sender,
+                server_message_sender: command_sender,
             },
             iced::Command::none(),
         )
@@ -194,7 +175,7 @@ impl Application for State {
         iced::Theme::GruvboxDark
     }
 
-    fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+    fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
         match message {
             Message::Tick => self.tick_update(),
             Message::TimeIntervallSelected(interval) => self.charts.adjust_time_interval(interval),
@@ -225,47 +206,37 @@ impl Application for State {
                 register_address,
                 size,
             } => {
-                self.command_sender
-                    .send(command::Command::ModbusGetHoldings {
+                self.server_message_sender
+                    .send(ServerMessage::Command(Command::ModbusGetHoldings {
                         register_address,
                         size,
-                    })
+                    }))
                     .expect("command_sender: could not send command");
-                self.charts.interpret_bytes_as = InterpretBytesAs::Holding;
             }
             Message::ReadRegisters {
                 register_address,
                 size,
             } => {
-                self.command_sender
-                    .send(command::Command::ModbusGetInputRegisters {
+                self.server_message_sender
+                    .send(ServerMessage::Command(Command::ModbusGetInputRegisters {
                         register_address,
                         size,
-                    })
+                    }))
                     .expect("command_sender: could not send command");
-                self.charts.interpret_bytes_as = InterpretBytesAs::InputRegister;
             }
             Message::ReadRealtime => {
-                self.charts.modbus_val.clear();
-                self.charts.interpret_bytes_as = InterpretBytesAs::Realtime;
-                for command in Realtime::generate_commands() {
-                    self.command_sender
-                        .send(command)
-                        .expect("command sender: could not send command");
-                }
+                self.server_message_sender
+                    .send(ServerMessage::ReadRealtime)
+                    .expect("command sender: could not send command");
             }
             Message::ReadRealtimeStatus => {
-                self.charts.modbus_val.clear();
-                self.charts.interpret_bytes_as = InterpretBytesAs::RealtimeStatus;
-                self.command_sender
-                    .send(RealtimeStatus::generate_command())
+                self.server_message_sender
+                    .send(ServerMessage::ReadRealtimeStatus)
                     .expect("command sender: could not send command");
             }
             Message::ReadVoltageSettings => {
-                self.charts.modbus_val.clear();
-                self.charts.interpret_bytes_as = InterpretBytesAs::VoltageSettings;
-                self.command_sender
-                    .send(VoltageSettings::generate_get_command())
+                self.server_message_sender
+                    .send(ServerMessage::ReadVoltageSettings)
                     .expect("command sender: could not send command");
             }
             Message::TabSelected(ix) => match ix {
@@ -278,7 +249,7 @@ impl Application for State {
             Message::FontLoaded(_) => {}
         }
         self.charts.clear_caches();
-        Command::none()
+        iced::Command::none()
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message, Self::Theme, iced::Renderer> {
