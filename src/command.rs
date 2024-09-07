@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum Command {
     GetIntervalms = 0x0,
@@ -50,6 +50,14 @@ impl Command {
         [b0, b1, b2, b3, b4]
     }
 
+    pub fn size(&self) -> u8 {
+        match self {
+            Command::ModbusGetHoldings { size, .. } => *size,
+            Command::ModbusGetInputRegisters { size, .. } => *size,
+            _ => 0,
+        }
+    }
+
     fn discriminant(&self) -> u8 {
         // WHYYYYYY !!!!!!!!!!!!!!!!!!!!!!
         unsafe { *(self as *const Self as *const u8) }
@@ -60,6 +68,7 @@ impl TryFrom<&[u8]> for Command {
     type Error = ();
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        log::info!("command: {:?}", value);
         match value {
             [0, ..] => Ok(Command::GetIntervalms),
             [1, ..] => Ok(Command::GetVoltageBufferSize),
@@ -67,11 +76,11 @@ impl TryFrom<&[u8]> for Command {
             [3, ..] => Ok(Command::GetBatteryPackBuffer),
             [4, ..] => Ok(Command::GetPVBuffer),
             [5, ..] => Ok(Command::RetransmitBuffers),
-            [6, h1, h2, h3] => Ok(Command::ModbusGetHoldings {
+            [6, h1, h2, h3, _h4] => Ok(Command::ModbusGetHoldings {
                 register_address: u16::from_be_bytes([*h1, *h2]),
                 size: *h3,
             }),
-            [7, h1, h2, h3] => Ok(Command::ModbusGetInputRegisters {
+            [7, h1, h2, h3, _h4] => Ok(Command::ModbusGetInputRegisters {
                 register_address: u16::from_be_bytes([*h1, *h2]),
                 size: *h3,
             }),
