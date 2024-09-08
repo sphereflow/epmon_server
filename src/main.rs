@@ -6,7 +6,7 @@ use iced::{
     Alignment, Application, Length, Settings, Subscription,
 };
 use remote_data::RemoteData;
-use server_task::ServerMessage;
+use server_task::{Server, ServerMessage};
 use std::{
     sync::{mpsc::*, Arc, Mutex},
     thread,
@@ -35,7 +35,7 @@ fn main() {
 
     thread::spawn(move || udp_broadcast(connected_bc));
     thread::spawn(move || {
-        server_task::server_task(connected, remote_data_sender, command_receiver)
+        Server::run(Server::new(connected, remote_data_sender, command_receiver))
     });
     State::run(Settings {
         flags: (remote_data_receiver, command_sender, connected_main_app),
