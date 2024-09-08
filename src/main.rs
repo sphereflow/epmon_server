@@ -67,6 +67,7 @@ pub enum Message {
     TabSelected(i32),
     ToggleChartControls,
     ReadVoltageSettings,
+    ReadRated,
 }
 
 struct State {
@@ -128,6 +129,9 @@ impl State {
             }
             RemoteData::VoltageSettings(voltage_settings) => {
                 self.charts.voltage_settings = voltage_settings
+            }
+            RemoteData::Rated(rated) => {
+                self.charts.rated_data = rated;
             }
         }
         if bupdate_battery2 {
@@ -237,6 +241,11 @@ impl Application for State {
             Message::ReadVoltageSettings => {
                 self.server_message_sender
                     .send(ServerMessage::ReadVoltageSettings)
+                    .expect("command sender: could not send command");
+            }
+            Message::ReadRated => {
+                self.server_message_sender
+                    .send(ServerMessage::ReadRated)
                     .expect("command sender: could not send command");
             }
             Message::TabSelected(ix) => match ix {

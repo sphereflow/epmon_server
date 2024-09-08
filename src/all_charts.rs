@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     time_interval::TimeInterval,
-    tracer_an::{two_bytes_to_f32, Realtime, RealtimeStatus, VoltageSettings},
+    tracer_an::{two_bytes_to_f32, Rated, Realtime, RealtimeStatus, VoltageSettings},
     voltage_chart::VoltageChart,
     Message, CHART_HEIGHT,
 };
@@ -27,6 +27,7 @@ pub struct AllCharts {
     pub modbus_val: Vec<u8>,
     pub realtime_data: Realtime,
     pub realtime_status_data: RealtimeStatus,
+    pub rated_data: Rated,
     pub voltage_settings: VoltageSettings,
     pub chart_controls: bool,
     pub paused: bool,
@@ -71,6 +72,7 @@ impl Default for AllCharts {
             realtime_data: Default::default(),
             realtime_status_data: Default::default(),
             voltage_settings: Default::default(),
+            rated_data: Default::default(),
             connected: Arc::new(Mutex::new(false)),
         }
     }
@@ -239,6 +241,7 @@ impl AllCharts {
         };
         let realtime_text = text(format!("{}", self.realtime_data));
         let realtime_status_text = text(format!("{}", self.realtime_status_data));
+        let rated_col = self.view_rated();
         let register_col = Column::new()
             .push(register_text_input)
             .push(spacer())
@@ -252,13 +255,11 @@ impl AllCharts {
             .push(read_realtime_status_button)
             .push(realtime_status_text);
         let row1 = Row::new()
-            .push(spacer())
             .push(register_col)
-            .push(spacer())
             .push(realtime_col)
-            .push(spacer())
             .push(realtime_status_col)
-            .push(spacer());
+            .push(rated_col)
+            .spacing(30);
         let row2 = Row::new().push(self.view_settings());
         Column::new().push(spacer()).push(row1).push(row2).into()
     }
@@ -316,6 +317,16 @@ impl AllCharts {
             .push(spacer())
             .push(get_voltage_settings_button)
             .push(row)
+            .into()
+    }
+
+    fn view_rated(&self) -> Element<Message> {
+        let read_rated_button = Button::new("read rated").on_press(Message::ReadRated);
+        let rated_text = Text::new(format!("{}", self.rated_data));
+        Column::new()
+            .push(read_rated_button)
+            .push(spacer())
+            .push(rated_text)
             .into()
     }
 

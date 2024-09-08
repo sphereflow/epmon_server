@@ -101,6 +101,10 @@ fn server_loop(
                 let remote_data = RemoteData::read_voltage_settings(tcp_stream)?;
                 remote_data_sender.send(remote_data)?;
             }
+            ServerMessage::ReadRated => {
+                let remote_data = RemoteData::read_rated(tcp_stream)?;
+                remote_data_sender.send(remote_data)?;
+            }
         }
     }
 
@@ -153,4 +157,5 @@ pub enum ServerMessage {
     ReadRealtime,
     ReadRealtimeStatus,
     ReadVoltageSettings,
+    ReadRated,
 }

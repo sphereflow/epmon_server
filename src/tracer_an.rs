@@ -12,7 +12,7 @@ pub struct Tracer {
 
 pub const RATED_BASE_ADDRESS: u16 = 0x3000;
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct Rated {
     array_rated_voltage: f32,
     array_rated_current: f32,
@@ -83,7 +83,7 @@ impl Display for Rated {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub enum ChargingMode {
     ConnectDisconnect = 0x00,
     PWM,

@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     command,
-    tracer_an::{Realtime, RealtimeStatus, VoltageSettings},
+    tracer_an::{Rated, Realtime, RealtimeStatus, VoltageSettings},
 };
 
 #[derive(PartialEq, Debug, Clone, Default)]
@@ -22,6 +22,7 @@ pub enum RemoteData {
     Realtime(Realtime),
     RealtimeStatus(RealtimeStatus),
     VoltageSettings(VoltageSettings),
+    Rated(Rated),
 }
 
 impl RemoteData {
@@ -147,6 +148,19 @@ impl RemoteData {
         Ok(Self::VoltageSettings(VoltageSettings::from_bytes(
             &read_buf,
         )))
+    }
+
+    pub fn read_rated(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
+        let mut write_buf;
+        let mut bytes = Vec::new();
+        for command in Rated::generate_commands() {
+            write_buf = command.to_bytes();
+            tcp_stream.write_all(&write_buf)?;
+            let mut read_buf = vec![0; (command.size() * 2) as usize];
+            tcp_stream.read_exact(&mut read_buf)?;
+            bytes.extend_from_slice(&read_buf[..]);
+        }
+        Ok(Self::Rated(Rated::from_bytes(&bytes)))
     }
 
     pub fn take_adc_readings(&mut self) -> Vec<u16> {
