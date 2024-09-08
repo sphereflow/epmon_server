@@ -289,7 +289,8 @@ impl AllCharts {
             .push(Button::new("set under voltage recover"))
             .push(Button::new("set under voltage warning"))
             .push(Button::new("set low voltage disconnect"))
-            .push(Button::new("set discharging limit voltage"));
+            .push(Button::new("set discharging limit voltage"))
+            .push(Text::new("Settings valid?"));
         let display_voltage_settings_col = Column::new()
             .push(Space::new(1, 0.))
             .push(Text::new(format!("{}", s.battery_type)))
@@ -305,6 +306,7 @@ impl AllCharts {
             .push(Text::new(format!("{}", s.under_voltage_warning_voltage)))
             .push(Text::new(format!("{}", s.low_voltage_disconnect_voltage)))
             .push(Text::new(format!("{}", s.discharging_limit_voltage)))
+            .push(Text::new(format!("{:?}", s.check_settings_lifepo4())))
             .spacing(10);
         let voltage_settings_input_col = Column::new();
         let row = Row::new()

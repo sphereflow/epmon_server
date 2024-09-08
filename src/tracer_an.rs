@@ -689,7 +689,7 @@ impl VoltageSettings {
         }
     }
 
-    pub fn check_settings_lifepo4(&self) -> bool {
+    pub fn check_settings_lifepo4(&self) -> Result<(), String> {
         let c0 = self.battery_type == BatteryType::UserDefined;
         let c1 = self.over_voltage_disconnect > self.over_voltage_reconnect;
         let c2 = self.over_voltage_reconnect == self.charging_limit_voltage;
@@ -704,7 +704,51 @@ impl VoltageSettings {
         let c11 = self.under_voltage_warning_voltage >= self.discharging_limit_voltage;
         let c12 = self.low_voltage_disconnect_voltage >= self.discharging_limit_voltage + 0.2;
         let c13 = self.over_voltage_disconnect > self.charging_limit_voltage + 0.2;
-        c0 && c1 && c2 && c3 && c4 && c5 && c6 && c7 && c8 && c9 && c10 && c11 && c12 && c13
+        match (c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13) {
+            (_, false, ..) => Err(String::from(
+                "self.over_voltage_disconnect <= self.over_voltage_reconnect",
+            )),
+            (_, _, false, ..) => Err(String::from(
+                "self.over_voltage_reconnect != self.charging_limit_voltage",
+            )),
+            (_, _, _, false, ..) => Err(String::from(
+                "self.charging_limit_voltage < self.equalization_voltage",
+            )),
+            (_, _, _, _, false, ..) => Err(String::from(
+                "self.equalization_voltage != self.boost_voltage",
+            )),
+            (_, _, _, _, _, false, ..) => {
+                Err(String::from("self.boost_voltage < self.float_voltage"))
+            }
+            (_, _, _, _, _, _, false, ..) => Err(String::from(
+                "self.float_voltage <= self.boost_reconnect_voltage",
+            )),
+            (_, _, _, _, _, _, _, false, ..) => Err(String::from(
+                "self.boost_reconnect_voltage <= self.low_voltage_reconnect_voltage",
+            )),
+            (_, _, _, _, _, _, _, _, false, ..) => Err(String::from(
+                "self.low_voltage_reconnect_voltage <= self.low_voltage_disconnect_voltage",
+            )),
+            (_, _, _, _, _, _, _, _, _, false, ..) => Err(String::from(
+                "self.low_voltage_disconnect_voltage < self.discharging_limit_voltage",
+            )),
+            (_, _, _, _, _, _, _, _, _, _, false, ..) => Err(String::from(
+                "self.under_voltage_recover_voltage <= self.under_voltage_warning_voltage",
+            )),
+            (_, _, _, _, _, _, _, _, _, _, _, false, ..) => Err(String::from(
+                "self.under_voltage_warning_voltage < self.discharging_limit_voltage",
+            )),
+            (_, _, _, _, _, _, _, _, _, _, _, _, false, ..) => Err(String::from(
+                "self.low_voltage_disconnect_voltage < self.discharging_limit_voltage + 0.2",
+            )),
+            (_, _, _, _, _, _, _, _, _, _, _, _, _, false, ..) => Err(String::from(
+                "self.over_voltage_disconnect < self.charging_limit_voltage + 0.2",
+            )),
+            (false, ..) => Err(String::from(
+                "Battery type != UserDefined = Everything else OK",
+            )),
+            _ => Ok(()),
+        }
     }
 }
 
@@ -715,6 +759,7 @@ pub enum BatteryType {
     Sealed,
     Gel,
     Flooded,
+    LFP8S,
     OutOfBounds,
 }
 
@@ -725,6 +770,7 @@ impl From<u16> for BatteryType {
             1 => Self::Sealed,
             2 => Self::Gel,
             3 => Self::Flooded,
+            5 => Self::LFP8S,
             _ => Self::OutOfBounds,
         }
     }
