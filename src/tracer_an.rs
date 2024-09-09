@@ -211,6 +211,36 @@ pub fn two_bytes_to_f32(bytes: [u8; 2]) -> f32 {
     (integer as f32) / 100.0
 }
 
+pub fn f32_to_two_bytes(f: f32) -> [u8; 2] {
+    let integer = (f / 0.01) as u16;
+    integer.to_be_bytes()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn f32_bytes_f32() {
+        for u in 0_u16..10000 {
+            let f = (u as f32).ceil();
+            println!("{f}");
+            let f = f / 100.0;
+            println!("{f}");
+            let res = two_bytes_to_f32(f32_to_two_bytes(f));
+            assert_eq!(f, res);
+        }
+    }
+
+    #[test]
+    fn bytes_f32_bytes() {
+        for i in 0_u16..10000 {
+            let bytes = i.to_be_bytes();
+            let res = f32_to_two_bytes(two_bytes_to_f32(bytes));
+            assert_eq!(bytes, res);
+        }
+    }
+}
 pub const REALTIME_STATUS_BASE_ADDRESS: u16 = 0x3200;
 
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
@@ -689,6 +719,32 @@ impl VoltageSettings {
         }
     }
 
+    pub fn generate_set_command(&self) -> Command {
+        let [b0, b1] = (self.battery_type as u16).to_be_bytes();
+        let [b2, b3] = self.battery_capacity.to_be_bytes();
+        let [b4, b5] = self.temperature_compensation_coefficient.to_be_bytes();
+        let [b6, b7] = ((self.over_voltage_disconnect / 0.01) as u16).to_be_bytes();
+        let [b8, b9] = ((self.charging_limit_voltage / 0.01) as u16).to_be_bytes();
+        let [b10, b11] = ((self.over_voltage_reconnect / 0.01) as u16).to_be_bytes();
+        let [b12, b13] = ((self.equalization_voltage / 0.01) as u16).to_be_bytes();
+        let [b14, b15] = ((self.boost_voltage / 0.01) as u16).to_be_bytes();
+        let [b16, b17] = ((self.float_voltage / 0.01) as u16).to_be_bytes();
+        let [b18, b19] = ((self.boost_reconnect_voltage / 0.01) as u16).to_be_bytes();
+        let [b20, b21] = ((self.low_voltage_reconnect_voltage / 0.01) as u16).to_be_bytes();
+        let [b22, b23] = ((self.under_voltage_recover_voltage / 0.01) as u16).to_be_bytes();
+        let [b24, b25] = ((self.under_voltage_warning_voltage / 0.01) as u16).to_be_bytes();
+        let [b26, b27] = ((self.low_voltage_disconnect_voltage / 0.01) as u16).to_be_bytes();
+        let [b28, b29] = ((self.discharging_limit_voltage / 0.01) as u16).to_be_bytes();
+        let bytes = [
+            b0, b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15, b16, b17, b18,
+            b19, b20, b21, b22, b23, b24, b25, b26, b27, b28, b29,
+        ];
+        Command::ModbusSetHoldings {
+            register_address: VOLTAGE_SETTINGS_BASE_ADDRESS,
+            new_holding_values: bytes,
+        }
+    }
+
     pub fn check_settings_lifepo4(&self) -> Result<(), String> {
         let c0 = self.battery_type == BatteryType::UserDefined;
         let c1 = self.over_voltage_disconnect > self.over_voltage_reconnect;
@@ -755,12 +811,12 @@ impl VoltageSettings {
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub enum BatteryType {
     #[default]
-    UserDefined,
-    Sealed,
-    Gel,
-    Flooded,
-    LFP8S,
-    OutOfBounds,
+    UserDefined = 0,
+    Sealed = 1,
+    Gel = 2,
+    Flooded = 3,
+    LFP8S = 5,
+    OutOfBounds = 6,
 }
 
 impl From<u16> for BatteryType {

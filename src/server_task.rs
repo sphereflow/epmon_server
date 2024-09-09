@@ -1,6 +1,7 @@
 use crate::{
     command::{self, Command},
     remote_data::RemoteData,
+    tracer_an::VoltageSettings,
 };
 use mpsc::{Receiver, SendError, Sender};
 use std::{
@@ -101,10 +102,20 @@ impl Server {
                     let remote_data = RemoteData::read_rated(tcp_stream)?;
                     self.remote_data_sender.send(remote_data)?;
                 }
+                ServerMessage::SetVoltageSettings(cs) => {
+                    Self::send_command(cs.generate_set_command(), tcp_stream)?
+                }
             }
         }
         thread::sleep(Duration::from_millis(500));
         Ok(())
+    }
+
+    pub fn send_command(
+        command: Command,
+        tcp_stream: &mut TcpStream,
+    ) -> Result<(), std::io::Error> {
+        tcp_stream.write_all(&command.to_bytes())
     }
 
     pub fn serve_command(
@@ -154,4 +165,5 @@ pub enum ServerMessage {
     ReadRealtimeStatus,
     ReadVoltageSettings,
     ReadRated,
+    SetVoltageSettings(VoltageSettings),
 }

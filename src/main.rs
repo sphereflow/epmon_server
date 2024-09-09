@@ -13,6 +13,7 @@ use std::{
     time::Instant,
 };
 use time_interval::TimeInterval;
+use tracer_an::BatteryType;
 use udp_broadcast_task::udp_broadcast;
 
 pub mod all_charts;
@@ -68,6 +69,20 @@ pub enum Message {
     ToggleChartControls,
     ReadVoltageSettings,
     ReadRated,
+    BatteryTypeSelected(BatteryType),
+    InputOverVoltageDisconnect(String),
+    InputChargingLimitVoltage(String),
+    InputOverVoltageReconnect(String),
+    InputEqualizationVoltage(String),
+    InputBoostVoltage(String),
+    InputFloatVoltage(String),
+    InputBoostReconnectVoltage(String),
+    InputLowVoltageReconnectVoltage(String),
+    InputUnderVoltageRecoverVoltage(String),
+    InputUnderVoltageWarningVoltage(String),
+    InputLowVoltageDisconnectVoltage(String),
+    InputDischargingLimitVoltage(String),
+    SendServerMessage(ServerMessage),
 }
 
 struct State {
@@ -128,7 +143,8 @@ impl State {
                 self.charts.realtime_status_data = realtime_status
             }
             RemoteData::VoltageSettings(voltage_settings) => {
-                self.charts.voltage_settings = voltage_settings
+                self.charts.voltage_settings = voltage_settings;
+                self.charts.change_voltage_settings = voltage_settings;
             }
             RemoteData::Rated(rated) => {
                 self.charts.rated_data = rated;
@@ -255,6 +271,106 @@ impl Application for State {
             Message::ToggleChartControls => {
                 self.charts.chart_controls = !self.charts.chart_controls
             }
+            Message::BatteryTypeSelected(battery_type) => {
+                self.charts.change_voltage_settings.battery_type = battery_type;
+            }
+            Message::InputOverVoltageDisconnect(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts.change_voltage_settings.over_voltage_disconnect = f;
+                }
+            }
+            Message::InputChargingLimitVoltage(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts.change_voltage_settings.charging_limit_voltage = f;
+                }
+            }
+
+            Message::InputOverVoltageReconnect(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts.change_voltage_settings.over_voltage_reconnect = f;
+                }
+            }
+
+            Message::InputEqualizationVoltage(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts.change_voltage_settings.equalization_voltage = f;
+                }
+            }
+
+            Message::InputBoostVoltage(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts.change_voltage_settings.boost_voltage = f;
+                }
+            }
+
+            Message::InputFloatVoltage(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts.change_voltage_settings.float_voltage = f;
+                }
+            }
+
+            Message::InputBoostReconnectVoltage(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts.change_voltage_settings.boost_reconnect_voltage = f;
+                }
+            }
+
+            Message::InputLowVoltageReconnectVoltage(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts
+                        .change_voltage_settings
+                        .low_voltage_reconnect_voltage = f;
+                }
+            }
+
+            Message::InputUnderVoltageRecoverVoltage(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts
+                        .change_voltage_settings
+                        .under_voltage_recover_voltage = f;
+                }
+            }
+
+            Message::InputUnderVoltageWarningVoltage(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts
+                        .change_voltage_settings
+                        .under_voltage_warning_voltage = f;
+                }
+            }
+
+            Message::InputLowVoltageDisconnectVoltage(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts
+                        .change_voltage_settings
+                        .low_voltage_disconnect_voltage = f;
+                }
+            }
+
+            Message::InputDischargingLimitVoltage(s) => {
+                if let Ok(f) = s.parse::<f32>() {
+                    let f = (f / 0.01).round() / 100.0;
+                    self.charts
+                        .change_voltage_settings
+                        .discharging_limit_voltage = f;
+                }
+            }
+            Message::SendServerMessage(message) => self
+                .server_message_sender
+                .send(message)
+                .expect("could not send server message"),
+
             Message::FontLoaded(_) => {}
         }
         self.charts.clear_caches();

@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
+    server_task::ServerMessage,
     time_interval::TimeInterval,
-    tracer_an::{two_bytes_to_f32, Rated, Realtime, RealtimeStatus, VoltageSettings},
+    tracer_an::{two_bytes_to_f32, BatteryType, Rated, Realtime, RealtimeStatus, VoltageSettings},
     voltage_chart::VoltageChart,
     Message, CHART_HEIGHT,
 };
@@ -29,6 +30,7 @@ pub struct AllCharts {
     pub realtime_status_data: RealtimeStatus,
     pub rated_data: Rated,
     pub voltage_settings: VoltageSettings,
+    pub change_voltage_settings: VoltageSettings,
     pub chart_controls: bool,
     pub paused: bool,
     pub connected: Arc<Mutex<bool>>,
@@ -72,6 +74,7 @@ impl Default for AllCharts {
             realtime_data: Default::default(),
             realtime_status_data: Default::default(),
             voltage_settings: Default::default(),
+            change_voltage_settings: Default::default(),
             rated_data: Default::default(),
             connected: Arc::new(Mutex::new(false)),
         }
@@ -273,24 +276,26 @@ impl AllCharts {
 
     fn view_voltage_settings(&self) -> Element<Message> {
         let s = self.voltage_settings;
+        let cs = self.change_voltage_settings;
         let get_voltage_settings_button =
             Button::new("get voltage settings").on_press(Message::ReadVoltageSettings);
         let set_buttons_col = Column::new()
-            .push(Space::new(1, 4))
-            .push(Button::new("set battery type"))
-            .push(Button::new("set over voltage disconnect"))
-            .push(Button::new("set charging limit voltage"))
-            .push(Button::new("set over voltage reconnect"))
-            .push(Button::new("set equalization voltage"))
-            .push(Button::new("set boost voltage"))
-            .push(Button::new("set float voltage"))
-            .push(Button::new("set boost reconnect voltage"))
-            .push(Button::new("set low voltage reconnect"))
-            .push(Button::new("set under voltage recover"))
-            .push(Button::new("set under voltage warning"))
-            .push(Button::new("set low voltage disconnect"))
-            .push(Button::new("set discharging limit voltage"))
-            .push(Text::new("Settings valid?"));
+            .push(Space::new(1, 0))
+            .push(Text::new("battery type"))
+            .push(Text::new("over voltage disconnect"))
+            .push(Text::new("charging limit voltage"))
+            .push(Text::new("over voltage reconnect"))
+            .push(Text::new("equalization voltage"))
+            .push(Text::new("boost voltage"))
+            .push(Text::new("float voltage"))
+            .push(Text::new("boost reconnect voltage"))
+            .push(Text::new("low voltage reconnect"))
+            .push(Text::new("under voltage recover"))
+            .push(Text::new("under voltage warning"))
+            .push(Text::new("low voltage disconnect"))
+            .push(Text::new("discharging limit voltage"))
+            .push(Text::new("Settings valid?"))
+            .spacing(10);
         let display_voltage_settings_col = Column::new()
             .push(Space::new(1, 0.))
             .push(Text::new(format!("{}", s.battery_type)))
@@ -306,15 +311,91 @@ impl AllCharts {
             .push(Text::new(format!("{}", s.under_voltage_warning_voltage)))
             .push(Text::new(format!("{}", s.low_voltage_disconnect_voltage)))
             .push(Text::new(format!("{}", s.discharging_limit_voltage)))
-            .push(Text::new(format!("{:?}", s.check_settings_lifepo4())))
+            .push(Text::new(format!("{:?}", s.check_settings_lifepo4())).width(200))
             .spacing(10);
-        let voltage_settings_input_col = Column::new();
+        let battery_type_options = [
+            BatteryType::UserDefined,
+            BatteryType::Sealed,
+            BatteryType::Gel,
+            BatteryType::Flooded,
+            BatteryType::LFP8S,
+        ];
+        fn voltage_text_input(f: f32) -> TextInput<'static, Message> {
+            TextInput::new("", &format!("{:.2}", f))
+        }
+        let set_voltages_button = Button::new("SET").on_press(Message::SendServerMessage(
+            ServerMessage::SetVoltageSettings(cs),
+        ));
+        let voltage_settings_input_col = Column::new()
+            .push(PickList::new(
+                battery_type_options,
+                Some(self.change_voltage_settings.battery_type),
+                Message::BatteryTypeSelected,
+            ))
+            .push(
+                voltage_text_input(self.change_voltage_settings.over_voltage_disconnect)
+                    .on_input(Message::InputOverVoltageDisconnect),
+            )
+            .push(
+                voltage_text_input(self.change_voltage_settings.charging_limit_voltage)
+                    .on_input(Message::InputChargingLimitVoltage),
+            )
+            .push(
+                voltage_text_input(self.change_voltage_settings.over_voltage_reconnect)
+                    .on_input(Message::InputOverVoltageReconnect),
+            )
+            .push(
+                voltage_text_input(self.change_voltage_settings.equalization_voltage)
+                    .on_input(Message::InputEqualizationVoltage),
+            )
+            .push(
+                voltage_text_input(self.change_voltage_settings.boost_voltage)
+                    .on_input(Message::InputBoostVoltage),
+            )
+            .push(
+                voltage_text_input(self.change_voltage_settings.float_voltage)
+                    .on_input(Message::InputFloatVoltage),
+            )
+            .push(
+                voltage_text_input(self.change_voltage_settings.boost_reconnect_voltage)
+                    .on_input(Message::InputBoostReconnectVoltage),
+            )
+            .push(
+                voltage_text_input(self.change_voltage_settings.low_voltage_reconnect_voltage)
+                    .on_input(Message::InputLowVoltageReconnectVoltage),
+            )
+            .push(
+                voltage_text_input(self.change_voltage_settings.under_voltage_recover_voltage)
+                    .on_input(Message::InputUnderVoltageRecoverVoltage),
+            )
+            .push(
+                voltage_text_input(self.change_voltage_settings.under_voltage_warning_voltage)
+                    .on_input(Message::InputUnderVoltageWarningVoltage),
+            )
+            .push(
+                voltage_text_input(self.change_voltage_settings.low_voltage_disconnect_voltage)
+                    .on_input(Message::InputLowVoltageDisconnectVoltage),
+            )
+            .push(
+                voltage_text_input(self.change_voltage_settings.discharging_limit_voltage)
+                    .on_input(Message::InputDischargingLimitVoltage),
+            )
+            .push(
+                Text::new(format!(
+                    "{:?}",
+                    self.change_voltage_settings.check_settings_lifepo4()
+                ))
+                .width(200),
+            )
+            .width(200);
         let row = Row::new()
             .push(set_buttons_col)
             .push(spacer())
             .push(display_voltage_settings_col)
             .push(spacer())
-            .push(voltage_settings_input_col);
+            .push(voltage_settings_input_col)
+            .push(spacer())
+            .push(set_voltages_button);
         Column::new()
             .push(spacer())
             .push(get_voltage_settings_button)
