@@ -18,7 +18,7 @@ pub enum Command {
     /// sets all the holding values at once
     ModbusSetHoldings {
         register_address: u16,
-        new_holding_values: [u8; 30],
+        new_holding_values: [u16; 15],
     },
 }
 
@@ -48,7 +48,7 @@ impl Command {
                 let [b1, b2] = register_address.to_be_bytes();
                 res[1] = b1;
                 res[2] = b2;
-                res[3..].clone_from_slice(new_holding_values);
+                res[3..].clone_from_slice(bytemuck::cast_slice(new_holding_values));
             }
             _ => {}
         }
@@ -90,7 +90,7 @@ impl TryFrom<&[u8]> for Command {
             }),
             [8, h1, h2, new_values @ ..] => Ok(Command::ModbusSetHoldings {
                 register_address: u16::from_be_bytes([*h1, *h2]),
-                new_holding_values: new_values
+                new_holding_values: bytemuck::cast_slice(new_values)
                     .try_into()
                     .expect("Command::try_from(...) => could not cast slice into array"),
             }),
