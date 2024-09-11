@@ -64,6 +64,10 @@ impl Server {
             println!("Interval : {intervalms:?} ms");
             remote_data_sender.send(intervalms).unwrap();
         }
+        if let Ok(intervalms) = RemoteData::read_interval_ms_power(tcp_stream) {
+            println!("Interval : {intervalms:?} ms");
+            remote_data_sender.send(intervalms).unwrap();
+        }
 
         let voltage_buffer_size = RemoteData::read_voltage_buffer_size(tcp_stream)?;
         remote_data_sender.send(voltage_buffer_size)?;

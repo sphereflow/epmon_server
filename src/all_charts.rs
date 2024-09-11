@@ -6,7 +6,7 @@ use crate::{
     tracer_an::{
         two_bytes_to_f32, BatteryType, Rated, Realtime, RealtimeStatus, Stats, VoltageSettings,
     },
-    voltage_chart::CustomChart,
+    voltage_chart::{ChartType, CustomChart},
     Message, CHART_HEIGHT,
 };
 use iced::{widget::*, Alignment, Element, Length};
@@ -26,8 +26,8 @@ pub struct AllCharts {
     pub max_time_day: f32,
     pub max_time: f32,
     pub max_time_fine: f32,
-    pub min_voltage: f32,
-    pub max_voltage: f32,
+    pub min_y: f32,
+    pub max_y: f32,
     pub register_address_string: String,
     pub register_address: u16,
     pub modbus_val: Vec<u8>,
@@ -62,10 +62,14 @@ impl Default for AllCharts {
         };
         let pv_power = CustomChart {
             title: "PV Power".to_string(),
+            max_y: 1200.0,
+            chart_type: ChartType::Power,
             ..Default::default()
         };
         let inverter_power = CustomChart {
             title: "Inverter Power".to_string(),
+            max_y: 1200.0,
+            chart_type: ChartType::Power,
             ..Default::default()
         };
         AllCharts {
@@ -80,8 +84,8 @@ impl Default for AllCharts {
             max_time_day: 0.0,
             max_time: 0.0,
             max_time_fine: 0.0,
-            min_voltage: 0.0,
-            max_voltage: 100.0,
+            min_y: 0.0,
+            max_y: 100.0,
             time_correctness: 1.0,
             chart_controls: true,
             paused: false,
@@ -103,7 +107,10 @@ impl AllCharts {
     pub fn view(&self) -> Element<Message> {
         let tab_bar = TabBar::new(Message::TabSelected)
             .push(0, TabLabel::Text(String::from("Voltage Charts")))
-            .push(1, TabLabel::Text(String::from("Modbus")));
+            .push(1, TabLabel::Text(String::from("Power Charts")))
+            .push(2, TabLabel::Text(String::from("Stats")))
+            .push(3, TabLabel::Text(String::from("Settings")))
+            .set_active_tab(&(self.selected_tab as i32));
 
         let connected = *self.connected.lock().expect("could not lock mutex");
         let mut main_contents = Column::new();
@@ -112,15 +119,22 @@ impl AllCharts {
         }
 
         main_contents = main_contents.push(match self.selected_tab {
-            SelectedTab::VoltageCharts => self.view_charts(),
-            SelectedTab::Modbus => self.view_modbus(),
+            SelectedTab::VoltageCharts => self.view_voltage_charts(),
+            SelectedTab::PowerCharts => self.view_power_charts(),
+            SelectedTab::Stats => self.view_modbus(),
+            SelectedTab::Settings => self.view_settings(),
         });
-        Scrollable::new(Column::new().push(tab_bar).push(main_contents))
-            .height(Length::Shrink)
-            .into()
+        Scrollable::new(
+            Column::new()
+                .push(tab_bar)
+                .push(spacer())
+                .push(main_contents),
+        )
+        .height(Length::Shrink)
+        .into()
     }
 
-    fn view_charts(&self) -> Element<Message> {
+    fn view_voltage_charts(&self) -> Element<Message> {
         let control_row = self.view_chart_controls();
         let row1 = Row::new()
             .spacing(15)
@@ -146,6 +160,24 @@ impl AllCharts {
             .push(control_row)
             .push(row1)
             .push(row2)
+            .into()
+    }
+
+    fn view_power_charts(&self) -> Element<Message> {
+        let control_row = self.view_chart_controls();
+        let chart_row = Row::new()
+            .spacing(15)
+            .padding(20)
+            .width(Length::Fill)
+            .height(Length::Shrink)
+            .align_items(Alignment::Center)
+            .push(self.pv_power.view(0, CHART_HEIGHT * 1.7));
+        Column::new()
+            .width(Length::Fill)
+            .height(Length::Shrink)
+            .align_items(Alignment::Start)
+            .push(control_row)
+            .push(chart_row)
             .into()
     }
 
@@ -194,15 +226,15 @@ impl AllCharts {
         .step(0.1)
         .width(500);
         let min_voltage_slider = VerticalSlider::new(
-            5.0..=(self.max_voltage - 1.0),
-            self.min_voltage,
+            0.0..=(self.max_y - 1.0),
+            self.min_y,
             Message::MinVoltageSelected,
         )
         .step(1.0)
         .height(200.0);
         let max_voltage_slider = VerticalSlider::new(
-            (self.min_voltage + 1.0)..=200.0,
-            self.max_voltage,
+            (self.min_y + 1.0)..=200.0,
+            self.max_y,
             Message::MaxVoltageSelected,
         )
         .step(1.0)
@@ -289,14 +321,22 @@ impl AllCharts {
             .push(read_realtime_status_button)
             .push(realtime_status_text);
         let row1 = Row::new()
+            .push(Space::new(100, 10))
             .push(register_col)
             .push(realtime_col)
             .push(realtime_status_col)
+            .spacing(100);
+        let row2 = Row::new()
+            .push(Space::new(100, 10))
             .push(rated_col)
             .push(stats_col)
-            .spacing(30);
-        let row2 = Row::new().push(self.view_settings());
-        Column::new().push(spacer()).push(row1).push(row2).into()
+            .spacing(100);
+        Column::new()
+            .push(spacer())
+            .push(row1)
+            .push(row2)
+            .spacing(50)
+            .into()
     }
 
     fn view_settings(&self) -> Element<Message> {
@@ -478,15 +518,19 @@ impl AllCharts {
         self.adjust_time_interval(self.selected_time_interval);
     }
 
-    pub fn adjust_min_max_voltage(&mut self) {
-        self.battery1.min_y = 0.25 * self.min_voltage;
-        self.battery2.min_y = 0.25 * self.min_voltage;
-        self.battery_pack.min_y = 0.5 * self.min_voltage;
-        self.pv.min_y = self.min_voltage;
-        self.battery1.max_y = 0.25 * self.max_voltage;
-        self.battery2.max_y = 0.25 * self.max_voltage;
-        self.battery_pack.max_y = 0.5 * self.max_voltage;
-        self.pv.max_y = self.max_voltage;
+    pub fn adjust_min_max_y(&mut self) {
+        self.battery1.min_y = 0.25 * self.min_y;
+        self.battery2.min_y = 0.25 * self.min_y;
+        self.battery_pack.min_y = 0.5 * self.min_y;
+        self.pv.min_y = self.min_y;
+        self.pv_power.min_y = self.min_y * 6.0;
+        self.inverter_power.min_y = self.min_y * 6.0;
+        self.battery1.max_y = 0.25 * self.max_y;
+        self.battery2.max_y = 0.25 * self.max_y;
+        self.battery_pack.max_y = 0.5 * self.max_y;
+        self.pv.max_y = self.max_y;
+        self.pv_power.max_y = self.max_y * 6.0;
+        self.inverter_power.max_y = self.max_y * 6.0;
     }
 
     pub fn clear_caches(&mut self) {
@@ -499,6 +543,8 @@ impl AllCharts {
             &mut self.battery1,
             &mut self.battery2,
             &mut self.pv,
+            &mut self.pv_power,
+            &mut self.inverter_power,
         ]
         .map(f);
     }
@@ -507,7 +553,9 @@ impl AllCharts {
 #[derive(Debug, Copy, Clone)]
 pub enum SelectedTab {
     VoltageCharts,
-    Modbus,
+    PowerCharts,
+    Stats,
+    Settings,
 }
 
 fn spacer() -> Space {

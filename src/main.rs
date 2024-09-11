@@ -131,7 +131,7 @@ impl State {
             RemoteData::PVPower(_) => {
                 self.charts
                     .pv_power
-                    .update_power_from_remote(&mut remote_data, time_interval.accumulations());
+                    .update_power_from_remote(&mut remote_data, 1);
             }
             RemoteData::VoltageBufferSize(s) => self.voltage_buffer_size = s,
             RemoteData::VoltageIntervalms(interval) => {
@@ -143,6 +143,7 @@ impl State {
             }
             RemoteData::PowerIntervalms(interval) => {
                 let tick_len = interval as f32 / 1000.0;
+                println!("power chart tick_len : {}", tick_len);
                 self.charts.pv_power.tick_len = tick_len;
                 self.charts.inverter_power.tick_len = tick_len;
             }
@@ -226,12 +227,12 @@ impl Application for State {
                 self.charts.adjust_max_time();
             }
             Message::MaxVoltageSelected(max_voltage) => {
-                self.charts.max_voltage = max_voltage;
-                self.charts.adjust_min_max_voltage();
+                self.charts.max_y = max_voltage;
+                self.charts.adjust_min_max_y();
             }
             Message::MinVoltageSelected(min_voltage) => {
-                self.charts.min_voltage = min_voltage;
-                self.charts.adjust_min_max_voltage();
+                self.charts.min_y = min_voltage;
+                self.charts.adjust_min_max_y();
             }
             Message::PauseUnpause => self.charts.paused = !self.charts.paused,
             Message::AddressInput(s) => {
@@ -289,7 +290,9 @@ impl Application for State {
             }
             Message::TabSelected(ix) => match ix {
                 0 => self.charts.selected_tab = SelectedTab::VoltageCharts,
-                _ => self.charts.selected_tab = SelectedTab::Modbus,
+                1 => self.charts.selected_tab = SelectedTab::PowerCharts,
+                2 => self.charts.selected_tab = SelectedTab::Stats,
+                _ => self.charts.selected_tab = SelectedTab::Settings,
             },
             Message::ToggleChartControls => {
                 self.charts.chart_controls = !self.charts.chart_controls

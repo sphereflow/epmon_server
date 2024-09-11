@@ -8,6 +8,13 @@ use iced::*;
 use plotters_iced::{Chart, ChartWidget};
 use std::{collections::VecDeque, ops::Range};
 
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum ChartType {
+    #[default]
+    Voltage,
+    Power,
+}
+
 #[derive(Debug)]
 pub struct CustomChart {
     pub title: String,
@@ -26,6 +33,7 @@ pub struct CustomChart {
     pub data_range: Range<usize>,
     /// time between 2 voltage measurements
     pub tick_len: f32,
+    pub chart_type: ChartType,
 }
 
 impl Default for CustomChart {
@@ -42,6 +50,7 @@ impl Default for CustomChart {
             max_time: 0.0,
             data_range: (0..0),
             tick_len: 0.02,
+            chart_type: Default::default(),
         }
     }
 }
@@ -63,11 +72,14 @@ impl CustomChart {
     }
 
     pub fn update_power_from_remote(&mut self, remote_data: &mut RemoteData, num_acc: usize) {
-        let power_readings = remote_data.take_adc_readings();
+        let power_readings = remote_data.take_power_readings();
         let power_values: VecDeque<f32> = power_readings
             .iter()
             .map(|&power_reading| power_reading as f32)
             .collect();
+        if !power_values.is_empty() {
+            println!("new power values : {:?}", power_values);
+        }
         self.data.try_reserve(power_values.len()).ok();
         for power_value in power_values {
             self.data.push_back(power_value);
@@ -79,7 +91,7 @@ impl CustomChart {
 
     fn update_data_range(&mut self) {
         self.data_range.start = self.index_for_time(self.min_time);
-        self.data_range.end = self.index_for_time(self.max_time);
+        self.data_range.end = (1 + self.index_for_time(self.max_time)).min(self.data.len());
     }
 
     fn time_for_index(&self, ix: usize) -> f32 {
@@ -146,11 +158,19 @@ impl CustomChart {
             .into()
     }
 
-    pub fn adjust_time_interval(&mut self, time_inteval: TimeInterval) {
-        let interval_seconds = time_inteval.to_seconds();
+    pub fn adjust_time_interval(&mut self, time_interval: TimeInterval) {
+        let interval_seconds = time_interval.to_seconds();
         self.max_time = self.max_time.min(0.0);
         self.min_time = self.max_time - interval_seconds;
-        self.accumulate_into_view_buffer(time_inteval.accumulations());
+        match self.chart_type {
+            ChartType::Voltage => {
+                self.accumulate_into_view_buffer(time_interval.accumulations());
+            }
+            ChartType::Power => {
+                self.accumulate_into_view_buffer(1);
+            }
+        }
+        self.cache.clear();
     }
 }
 
@@ -175,9 +195,14 @@ impl Chart<Message> for CustomChart {
         use plotters::prelude::*;
         const PLOT_LINE_COLOR: RGBColor = RGBColor(0, 175, 255);
 
+        let y_unit_text = match self.chart_type {
+            ChartType::Voltage => "V",
+            ChartType::Power => "W",
+        };
+
         let mut chart = builder
             .x_label_area_size(28)
-            .y_label_area_size(40)
+            .y_label_area_size(50)
             .margin(20)
             .build_cartesian_2d(self.min_time..self.max_time, self.min_y..self.max_y)
             .expect("failed to build chart");
@@ -192,7 +217,7 @@ impl Chart<Message> for CustomChart {
             .y_label_style(
                 ("mono", 15.0)
                     .into_font()
-                    .color(&plotters::style::colors::BLUE.mix(0.65))
+                    .color(&plotters::style::colors::GREEN.mix(0.9))
                     .transform(FontTransform::Rotate90),
             )
             .x_label_style(
@@ -207,7 +232,7 @@ impl Chart<Message> for CustomChart {
                     format!("{:.0}m", x / 60.0)
                 }
             })
-            .y_label_formatter(&|y| format!("{:.1}V", y))
+            .y_label_formatter(&|y| format!("{:.1} {}", y, y_unit_text))
             .draw()
             .expect("failed to draw chart mesh");
 
