@@ -57,6 +57,7 @@ pub enum Message {
     MaxTimeDaySelected(f32),
     MaxTimeSelected(f32),
     MaxTimeFineSelected(f32),
+    MinVoltageSelected(f32),
     MaxVoltageSelected(f32),
     FontLoaded(Result<(), font::Error>),
     AddressInput(String),
@@ -69,6 +70,7 @@ pub enum Message {
     ToggleChartControls,
     ReadVoltageSettings,
     ReadRated,
+    ReadStats,
     BatteryTypeSelected(BatteryType),
     InputOverVoltageDisconnect(String),
     InputChargingLimitVoltage(String),
@@ -99,8 +101,7 @@ impl State {
         while let Ok(remote_data) = self.remote_data_receiver.try_recv() {
             self.update_remote_data(remote_data);
         }
-        self.charts.time_correctness = self.charts.pv.tick_len
-            * self.charts.pv.voltages.len() as f32
+        self.charts.time_correctness = self.charts.pv.tick_len * self.charts.pv.data.len() as f32
             / (self.voltage_buffer_size as f32 * self.charts.pv.tick_len
                 + (Instant::now() - self.start_instant).as_secs() as f32);
     }
@@ -127,13 +128,23 @@ impl State {
                     .pv
                     .update_from_remote(&mut remote_data, time_interval.accumulations());
             }
+            RemoteData::PVPower(_) => {
+                self.charts
+                    .pv_power
+                    .update_from_remote(&mut remote_data, time_interval.accumulations());
+            }
             RemoteData::VoltageBufferSize(s) => self.voltage_buffer_size = s,
-            RemoteData::Intervalms(interval) => {
+            RemoteData::VoltageIntervalms(interval) => {
                 let tick_len = interval as f32 / 1000.0;
                 self.charts.battery1.tick_len = tick_len;
                 self.charts.battery2.tick_len = tick_len;
                 self.charts.battery_pack.tick_len = tick_len;
                 self.charts.pv.tick_len = tick_len;
+            }
+            RemoteData::PowerIntervalms(interval) => {
+                let tick_len = interval as f32 / 1000.0;
+                self.charts.pv_power.tick_len = tick_len;
+                self.charts.inverter_power.tick_len = tick_len;
             }
             RemoteData::Holdings(val) | RemoteData::InputRegisters(val) => {
                 self.charts.modbus_val = val;
@@ -148,6 +159,9 @@ impl State {
             }
             RemoteData::Rated(rated) => {
                 self.charts.rated_data = rated;
+            }
+            RemoteData::Stats(stats) => {
+                self.charts.stats = stats;
             }
         }
         if bupdate_battery2 {
@@ -213,7 +227,11 @@ impl Application for State {
             }
             Message::MaxVoltageSelected(max_voltage) => {
                 self.charts.max_voltage = max_voltage;
-                self.charts.adjust_max_voltage();
+                self.charts.adjust_min_max_voltage();
+            }
+            Message::MinVoltageSelected(min_voltage) => {
+                self.charts.min_voltage = min_voltage;
+                self.charts.adjust_min_max_voltage();
             }
             Message::PauseUnpause => self.charts.paused = !self.charts.paused,
             Message::AddressInput(s) => {
@@ -262,6 +280,11 @@ impl Application for State {
             Message::ReadRated => {
                 self.server_message_sender
                     .send(ServerMessage::ReadRated)
+                    .expect("command sender: could not send command");
+            }
+            Message::ReadStats => {
+                self.server_message_sender
+                    .send(ServerMessage::ReadStats)
                     .expect("command sender: could not send command");
             }
             Message::TabSelected(ix) => match ix {

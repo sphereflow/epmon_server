@@ -3,8 +3,10 @@ use std::sync::{Arc, Mutex};
 use crate::{
     server_task::ServerMessage,
     time_interval::TimeInterval,
-    tracer_an::{two_bytes_to_f32, BatteryType, Rated, Realtime, RealtimeStatus, VoltageSettings},
-    voltage_chart::VoltageChart,
+    tracer_an::{
+        two_bytes_to_f32, BatteryType, Rated, Realtime, RealtimeStatus, Stats, VoltageSettings,
+    },
+    voltage_chart::CustomChart,
     Message, CHART_HEIGHT,
 };
 use iced::{widget::*, Alignment, Element, Length};
@@ -13,15 +15,18 @@ use iced_aw::{TabBar, TabLabel};
 #[derive(Debug)]
 pub struct AllCharts {
     pub selected_tab: SelectedTab,
-    pub battery1: VoltageChart,
-    pub battery2: VoltageChart,
-    pub battery_pack: VoltageChart,
-    pub pv: VoltageChart,
+    pub battery1: CustomChart,
+    pub battery2: CustomChart,
+    pub battery_pack: CustomChart,
+    pub pv: CustomChart,
+    pub pv_power: CustomChart,
+    pub inverter_power: CustomChart,
     pub selected_time_interval: TimeInterval,
     pub time_correctness: f32,
     pub max_time_day: f32,
     pub max_time: f32,
     pub max_time_fine: f32,
+    pub min_voltage: f32,
     pub max_voltage: f32,
     pub register_address_string: String,
     pub register_address: u16,
@@ -29,6 +34,7 @@ pub struct AllCharts {
     pub realtime_data: Realtime,
     pub realtime_status_data: RealtimeStatus,
     pub rated_data: Rated,
+    pub stats: Stats,
     pub voltage_settings: VoltageSettings,
     pub change_voltage_settings: VoltageSettings,
     pub chart_controls: bool,
@@ -38,20 +44,28 @@ pub struct AllCharts {
 
 impl Default for AllCharts {
     fn default() -> Self {
-        let battery1 = VoltageChart {
+        let battery1 = CustomChart {
             title: "Battery1".to_string(),
             ..Default::default()
         };
-        let battery2 = VoltageChart {
+        let battery2 = CustomChart {
             title: "Battery2".to_string(),
             ..Default::default()
         };
-        let battery_pack = VoltageChart {
+        let battery_pack = CustomChart {
             title: "Battery Pack".to_string(),
             ..Default::default()
         };
-        let pv = VoltageChart {
+        let pv = CustomChart {
             title: "PV".to_string(),
+            ..Default::default()
+        };
+        let pv_power = CustomChart {
+            title: "PV Power".to_string(),
+            ..Default::default()
+        };
+        let inverter_power = CustomChart {
+            title: "Inverter Power".to_string(),
             ..Default::default()
         };
         AllCharts {
@@ -60,10 +74,13 @@ impl Default for AllCharts {
             battery2,
             battery_pack,
             pv,
+            pv_power,
+            inverter_power,
             selected_time_interval: Default::default(),
             max_time_day: 0.0,
             max_time: 0.0,
             max_time_fine: 0.0,
+            min_voltage: 0.0,
             max_voltage: 100.0,
             time_correctness: 1.0,
             chart_controls: true,
@@ -76,6 +93,7 @@ impl Default for AllCharts {
             voltage_settings: Default::default(),
             change_voltage_settings: Default::default(),
             rated_data: Default::default(),
+            stats: Default::default(),
             connected: Arc::new(Mutex::new(false)),
         }
     }
@@ -175,10 +193,20 @@ impl AllCharts {
         )
         .step(0.1)
         .width(500);
-        let max_voltage_slider =
-            VerticalSlider::new(10.0..=200.0, self.max_voltage, Message::MaxVoltageSelected)
-                .step(1.0)
-                .height(200.0);
+        let min_voltage_slider = VerticalSlider::new(
+            5.0..=(self.max_voltage - 1.0),
+            self.min_voltage,
+            Message::MinVoltageSelected,
+        )
+        .step(1.0)
+        .height(200.0);
+        let max_voltage_slider = VerticalSlider::new(
+            (self.min_voltage + 1.0)..=200.0,
+            self.max_voltage,
+            Message::MaxVoltageSelected,
+        )
+        .step(1.0)
+        .height(200.0);
         let pause_button = if self.paused {
             Button::new("unpause")
         } else {
@@ -199,6 +227,8 @@ impl AllCharts {
                     Space::new(30.0, 30.0),
                     max_time_slider_fine,
                 ])
+                .push(spacer())
+                .push(min_voltage_slider)
                 .push(Space::new(30.0, 30.0))
                 .push(max_voltage_slider)
                 .push(Space::new(30.0, 10.0))
@@ -245,6 +275,7 @@ impl AllCharts {
         let realtime_text = text(format!("{}", self.realtime_data));
         let realtime_status_text = text(format!("{}", self.realtime_status_data));
         let rated_col = self.view_rated();
+        let stats_col = self.view_stats();
         let register_col = Column::new()
             .push(register_text_input)
             .push(spacer())
@@ -262,6 +293,7 @@ impl AllCharts {
             .push(realtime_col)
             .push(realtime_status_col)
             .push(rated_col)
+            .push(stats_col)
             .spacing(30);
         let row2 = Row::new().push(self.view_settings());
         Column::new().push(spacer()).push(row1).push(row2).into()
@@ -413,14 +445,24 @@ impl AllCharts {
             .into()
     }
 
+    fn view_stats(&self) -> Element<Message> {
+        let read_stats_button = Button::new("read stats").on_press(Message::ReadStats);
+        let stats_text = Text::new(format!("{}", self.stats));
+        Column::new()
+            .push(read_stats_button)
+            .push(spacer())
+            .push(stats_text)
+            .into()
+    }
+
     pub fn update_battery2(&mut self) {
         let voltages = self
             .battery_pack
-            .voltages
+            .data
             .iter()
-            .zip(self.battery1.voltages.iter())
+            .zip(self.battery1.data.iter())
             .map(|(bp_voltage, b1_voltage)| bp_voltage - b1_voltage);
-        self.battery2.voltages = voltages.collect();
+        self.battery2.data = voltages.collect();
         self.battery2
             .accumulate_into_view_buffer(self.selected_time_interval.accumulations());
     }
@@ -436,18 +478,22 @@ impl AllCharts {
         self.adjust_time_interval(self.selected_time_interval);
     }
 
-    pub fn adjust_max_voltage(&mut self) {
-        self.battery1.max_voltage = 0.25 * self.max_voltage;
-        self.battery2.max_voltage = 0.25 * self.max_voltage;
-        self.battery_pack.max_voltage = 0.5 * self.max_voltage;
-        self.pv.max_voltage = self.max_voltage;
+    pub fn adjust_min_max_voltage(&mut self) {
+        self.battery1.min_y = 0.25 * self.min_voltage;
+        self.battery2.min_y = 0.25 * self.min_voltage;
+        self.battery_pack.min_y = 0.5 * self.min_voltage;
+        self.pv.min_y = self.min_voltage;
+        self.battery1.max_y = 0.25 * self.max_voltage;
+        self.battery2.max_y = 0.25 * self.max_voltage;
+        self.battery_pack.max_y = 0.5 * self.max_voltage;
+        self.pv.max_y = self.max_voltage;
     }
 
     pub fn clear_caches(&mut self) {
         self.map_charts(|vc| vc.cache.clear());
     }
 
-    fn map_charts<F: FnMut(&mut VoltageChart)>(&mut self, f: F) {
+    fn map_charts<F: FnMut(&mut CustomChart)>(&mut self, f: F) {
         [
             &mut self.battery_pack,
             &mut self.battery1,

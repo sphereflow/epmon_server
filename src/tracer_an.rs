@@ -7,7 +7,7 @@ pub struct Tracer {
     pub realtime: Realtime,
     pub realtime_status: RealtimeStatus,
     pub stats: Stats,
-    pub settings: Settings,
+    pub settings: VoltageSettings,
 }
 
 pub const RATED_BASE_ADDRESS: u16 = 0x3000;
@@ -323,7 +323,7 @@ impl Display for BatteryStatus {
         } else {
             writeln!(
                 f,
-                "    rated battery voltage and actual battery voltage are in line"
+                "    rated battery voltage ~~ \n        actual battery voltage"
             )
         }
     }
@@ -659,11 +659,148 @@ impl Display for DischargeStatus {
 
 pub const STATS_BASE_ADDRESS: u16 = 0x3300;
 
-#[derive(Default, Debug, Copy, Clone)]
-pub struct Stats {}
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
+pub struct Stats {
+    pub(crate) energy_voltage_data: [u16; 20],
+    pub(crate) battery_data: [u16; 3],
+}
 
-#[derive(Default, Debug, Copy, Clone)]
-pub struct Settings {}
+impl Stats {
+    pub fn max_pv_voltage_day(&self) -> f32 {
+        self.energy_voltage_data[0] as f32 / 100.0
+    }
+    pub fn min_pv_voltage_day(&self) -> f32 {
+        self.energy_voltage_data[1] as f32 / 100.0
+    }
+    pub fn max_battery_voltage_day(&self) -> f32 {
+        self.energy_voltage_data[2] as f32 / 100.0
+    }
+    pub fn min_battery_voltage_day(&self) -> f32 {
+        self.energy_voltage_data[3] as f32 / 100.0
+    }
+    pub fn consumed_energy_day(&self) -> f32 {
+        let h = self.energy_voltage_data[5] as u32;
+        let value = (h << 16) + self.energy_voltage_data[4] as u32;
+        value as f32 / 100.0
+    }
+    pub fn consumed_energy_month(&self) -> f32 {
+        let h = self.energy_voltage_data[7] as u32;
+        let value = (h << 16) + self.energy_voltage_data[6] as u32;
+        value as f32 / 100.0
+    }
+    pub fn consumed_energy_year(&self) -> f32 {
+        let h = self.energy_voltage_data[9] as u32;
+        let value = (h << 16) + self.energy_voltage_data[8] as u32;
+        value as f32 / 100.0
+    }
+    pub fn consumed_energy_total(&self) -> f32 {
+        let h = self.energy_voltage_data[11] as u32;
+        let value = (h << 16) + self.energy_voltage_data[10] as u32;
+        value as f32 / 100.0
+    }
+    pub fn generated_energy_day(&self) -> f32 {
+        let h = self.energy_voltage_data[13] as u32;
+        let value = (h << 16) + self.energy_voltage_data[12] as u32;
+        value as f32 / 100.0
+    }
+    pub fn generated_energy_month(&self) -> f32 {
+        let h = self.energy_voltage_data[15] as u32;
+        let value = (h << 16) + self.energy_voltage_data[14] as u32;
+        value as f32 / 100.0
+    }
+    pub fn generated_energy_year(&self) -> f32 {
+        let h = self.energy_voltage_data[17] as u32;
+        let value = (h << 16) + self.energy_voltage_data[16] as u32;
+        value as f32 / 100.0
+    }
+    pub fn generated_energy_total(&self) -> f32 {
+        let h = self.energy_voltage_data[19] as u32;
+        let value = (h << 16) + self.energy_voltage_data[18] as u32;
+        value as f32 / 100.0
+    }
+    pub fn battery_voltage(&self) -> f32 {
+        self.battery_data[0] as f32 / 100.0
+    }
+    pub fn battery_current(&self) -> f32 {
+        let h = self.battery_data[2] as u32;
+        let value = (h << 16) + self.battery_data[1] as u32;
+        value as f32 / 100.0
+    }
+
+    pub fn generate_get_commands() -> [Command; 2] {
+        [
+            Command::ModbusGetInputRegisters {
+                register_address: STATS_BASE_ADDRESS,
+                size: 20,
+            },
+            Command::ModbusGetInputRegisters {
+                register_address: STATS_BASE_ADDRESS + 26,
+                size: 3,
+            },
+        ]
+    }
+}
+
+impl Display for Stats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Stats:")?;
+        writeln!(f, "    min_pv_voltage_day: {} V", self.min_pv_voltage_day())?;
+        writeln!(f, "    max_pv_voltage_day: {} V", self.max_pv_voltage_day())?;
+        writeln!(
+            f,
+            "    min_battery_voltage_day: {} V",
+            self.max_pv_voltage_day()
+        )?;
+        writeln!(
+            f,
+            "    max_battery_voltage_day: {} V",
+            self.max_battery_voltage_day()
+        )?;
+        writeln!(
+            f,
+            "    consumed_energy_day: {} kWh",
+            self.consumed_energy_day()
+        )?;
+        writeln!(
+            f,
+            "    consumed_energy_month: {} kWh",
+            self.consumed_energy_month()
+        )?;
+        writeln!(
+            f,
+            "    consumed_energy_year: {} kWh",
+            self.consumed_energy_year()
+        )?;
+        writeln!(
+            f,
+            "    consumed_energy_total: {} kWh",
+            self.consumed_energy_total()
+        )?;
+        writeln!(
+            f,
+            "    generated_energy_day: {} kWh",
+            self.generated_energy_day()
+        )?;
+        writeln!(
+            f,
+            "    generated_energy_month: {} kWh",
+            self.generated_energy_month()
+        )?;
+        writeln!(
+            f,
+            "    generated_energy_year: {} kWh",
+            self.generated_energy_year()
+        )?;
+        writeln!(
+            f,
+            "    generated_energy_total: {} kWh",
+            self.generated_energy_total()
+        )?;
+        writeln!(f, "    battery_voltage: {} V", self.battery_voltage())?;
+        writeln!(f, "    battery_current: {} A", self.battery_current())?;
+        Ok(())
+    }
+}
 
 pub const VOLTAGE_SETTINGS_BASE_ADDRESS: u16 = 0x9000;
 

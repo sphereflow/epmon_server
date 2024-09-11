@@ -9,35 +9,35 @@ use plotters_iced::{Chart, ChartWidget};
 use std::{collections::VecDeque, ops::Range};
 
 #[derive(Debug)]
-pub struct VoltageChart {
+pub struct CustomChart {
     pub title: String,
-    pub voltages: VecDeque<f32>,
+    pub data: VecDeque<f32>,
     pub display_data: VecDeque<(f32, f32)>,
     pub cache: Cache,
-    // bottom border of the displayed chart
-    pub min_voltage: f32,
-    // top border of the displayed chart
-    pub max_voltage: f32,
-    // left border of the displayed chart
+    /// bottom border of the displayed chart
+    pub min_y: f32,
+    /// top border of the displayed chart
+    pub max_y: f32,
+    /// left border of the displayed chart
     pub min_time: f32,
-    // right border of the displayed chart
+    /// right border of the displayed chart
     pub max_time: f32,
-    // indices into data for actually visible data
+    /// indices into data for actually visible data
     pub data_range: Range<usize>,
-    // time between 2 voltage measurements
+    /// time between 2 voltage measurements
     pub tick_len: f32,
 }
 
-impl Default for VoltageChart {
+impl Default for CustomChart {
     fn default() -> Self {
         Self {
             title: Default::default(),
-            voltages: Default::default(),
+            data: Default::default(),
             display_data: Default::default(),
             // drawing cache should be cleared if new data arrives
             cache: Default::default(),
-            min_voltage: 0.0,
-            max_voltage: 100.0,
+            min_y: 0.0,
+            max_y: 100.0,
             min_time: -100.0,
             max_time: 0.0,
             data_range: (0..0),
@@ -46,7 +46,7 @@ impl Default for VoltageChart {
     }
 }
 
-impl VoltageChart {
+impl CustomChart {
     pub fn update_from_remote(&mut self, remote_data: &mut RemoteData, num_acc: usize) {
         let adc_readings = remote_data.take_adc_readings();
         let voltages: VecDeque<f32> = adc_readings
@@ -54,7 +54,7 @@ impl VoltageChart {
             .map(|adc_reading| adc_reading_to_voltage(*adc_reading))
             .collect();
         for voltage in voltages {
-            self.voltages.push_back(voltage);
+            self.data.push_back(voltage);
         }
 
         self.accumulate_into_view_buffer(num_acc);
@@ -67,10 +67,10 @@ impl VoltageChart {
     }
 
     fn time_for_index(&self, ix: usize) -> f32 {
-        let max_ix = if self.voltages.is_empty() {
+        let max_ix = if self.data.is_empty() {
             0
         } else {
-            self.voltages.len() - 1
+            self.data.len() - 1
         };
         let b = max_ix as f32 * -self.tick_len;
         let m = self.tick_len;
@@ -78,10 +78,10 @@ impl VoltageChart {
     }
 
     fn index_for_time(&self, time: f32) -> usize {
-        if self.voltages.is_empty() {
+        if self.data.is_empty() {
             return 0;
         }
-        let max_ix = self.voltages.len() - 1;
+        let max_ix = self.data.len() - 1;
         let b = max_ix as u32;
         let m = 1.0 / self.tick_len;
         let res = m * time + b as f32;
@@ -99,7 +99,7 @@ impl VoltageChart {
         let mut acc_voltage = 0.0;
         let mut acc_count = 1;
         let mut time = 0.0;
-        for (offset, val) in self.voltages.range(self.data_range.clone()).enumerate() {
+        for (offset, val) in self.data.range(self.data_range.clone()).enumerate() {
             if acc_count == 1 {
                 time = self.range_time(
                     (self.data_range.start + offset)..(self.data_range.start + offset + num_acc),
@@ -138,7 +138,7 @@ impl VoltageChart {
     }
 }
 
-impl Chart<Message> for VoltageChart {
+impl Chart<Message> for CustomChart {
     type State = ();
 
     #[inline]
@@ -163,10 +163,7 @@ impl Chart<Message> for VoltageChart {
             .x_label_area_size(28)
             .y_label_area_size(40)
             .margin(20)
-            .build_cartesian_2d(
-                self.min_time..self.max_time,
-                self.min_voltage..self.max_voltage,
-            )
+            .build_cartesian_2d(self.min_time..self.max_time, self.min_y..self.max_y)
             .expect("failed to build chart");
 
         chart

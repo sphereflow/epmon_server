@@ -60,7 +60,7 @@ impl Server {
     fn connection_established(&self, tcp_stream: &mut TcpStream) -> Result<(), ServerError> {
         let remote_data_sender = &self.remote_data_sender;
         println!("connection established");
-        if let Ok(intervalms) = RemoteData::read_interval_ms(tcp_stream) {
+        if let Ok(intervalms) = RemoteData::read_interval_ms_voltage(tcp_stream) {
             println!("Interval : {intervalms:?} ms");
             remote_data_sender.send(intervalms).unwrap();
         }
@@ -78,9 +78,10 @@ impl Server {
         self.remote_data_sender.send(battery_voltage)?;
         let battery_pack_voltage = RemoteData::read_battery_pack_voltage(tcp_stream)?;
         self.remote_data_sender.send(battery_pack_voltage)?;
-        if let Ok(pv_voltage) = RemoteData::read_pv_voltage(tcp_stream) {
-            self.remote_data_sender.send(pv_voltage)?;
-        }
+        let pv_voltage = RemoteData::read_pv_voltage(tcp_stream)?;
+        self.remote_data_sender.send(pv_voltage)?;
+        let pv_power = RemoteData::read_pv_power(tcp_stream)?;
+        self.remote_data_sender.send(pv_power)?;
         while let Ok(message) = self.server_message_receiver.try_recv() {
             match message {
                 ServerMessage::Command(command) => {
@@ -100,6 +101,10 @@ impl Server {
                 }
                 ServerMessage::ReadRated => {
                     let remote_data = RemoteData::read_rated(tcp_stream)?;
+                    self.remote_data_sender.send(remote_data)?;
+                }
+                ServerMessage::ReadStats => {
+                    let remote_data = RemoteData::read_stats(tcp_stream)?;
                     self.remote_data_sender.send(remote_data)?;
                 }
                 ServerMessage::SetVoltageSettings(cs) => {
@@ -165,5 +170,6 @@ pub enum ServerMessage {
     ReadRealtimeStatus,
     ReadVoltageSettings,
     ReadRated,
+    ReadStats,
     SetVoltageSettings(VoltageSettings),
 }
