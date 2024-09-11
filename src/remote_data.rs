@@ -30,33 +30,38 @@ pub enum RemoteData {
 impl RemoteData {
     pub fn read_battery_voltage(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
         tcp_stream.write_all(&Command::GetBuffer(BufferType::Battery1Voltage).to_bytes())?;
-        let voltages = Self::read_voltage(tcp_stream)?;
+        let voltages = Self::read_buffer(tcp_stream)?;
         Ok(RemoteData::BatteryVoltage(voltages))
     }
 
     pub fn read_battery_pack_voltage(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
         tcp_stream.write_all(&Command::GetBuffer(BufferType::BatteryPackVoltage).to_bytes())?;
-        let voltages = Self::read_voltage(tcp_stream)?;
+        let voltages = Self::read_buffer(tcp_stream)?;
         Ok(RemoteData::BatteryPackVoltage(voltages))
     }
 
     pub fn read_pv_voltage(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
         tcp_stream.write_all(&Command::GetBuffer(BufferType::PVVoltage).to_bytes())?;
-        let voltages = Self::read_voltage(tcp_stream)?;
+        let voltages = Self::read_buffer(tcp_stream)?;
         Ok(RemoteData::PVVoltage(voltages))
     }
 
     pub fn read_pv_power(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
         tcp_stream.write_all(&Command::GetBuffer(BufferType::PVPower).to_bytes())?;
-        let voltages = Self::read_voltage(tcp_stream)?;
-        Ok(RemoteData::PVVoltage(voltages))
+        println!("getting power_data");
+        let power_data = Self::read_buffer(tcp_stream)?;
+        Ok(RemoteData::PVPower(power_data))
     }
 
-    pub fn read_voltage(tcp_stream: &mut TcpStream) -> std::io::Result<Vec<u16>> {
+    pub fn read_buffer(tcp_stream: &mut TcpStream) -> std::io::Result<Vec<u16>> {
         let mut size_buf = [0; 4];
         tcp_stream.read_exact(&mut size_buf)?;
-        let voltage_buffer_size = u32::from_be_bytes(size_buf) as usize;
-        let mut buf = vec![0; voltage_buffer_size];
+        let buffer_size = u32::from_be_bytes(size_buf) as usize;
+        if buffer_size == 0 {
+            return Ok(Vec::new());
+        }
+        println!("buffer_size: {}", buffer_size);
+        let mut buf = vec![0; buffer_size];
         tcp_stream.read_exact(&mut buf)?;
         Ok(bytemuck::cast_slice(&buf).to_vec())
     }
@@ -136,7 +141,9 @@ impl RemoteData {
         let mut write_buf;
         let mut bytes = Vec::new();
         for command in Realtime::generate_commands() {
+            println!("read_realtime => sending command: {:?}", command);
             write_buf = command.to_bytes();
+            println!("write_buf: {:?}", write_buf);
             tcp_stream.write_all(&write_buf)?;
             let mut read_buf = vec![0; (command.size() * 2) as usize];
             tcp_stream.read_exact(&mut read_buf)?;
