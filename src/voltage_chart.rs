@@ -47,14 +47,30 @@ impl Default for CustomChart {
 }
 
 impl CustomChart {
-    pub fn update_from_remote(&mut self, remote_data: &mut RemoteData, num_acc: usize) {
+    pub fn update_voltages_from_remote(&mut self, remote_data: &mut RemoteData, num_acc: usize) {
         let adc_readings = remote_data.take_adc_readings();
         let voltages: VecDeque<f32> = adc_readings
             .iter()
             .map(|adc_reading| adc_reading_to_voltage(*adc_reading))
             .collect();
+        self.data.try_reserve(voltages.len()).ok();
         for voltage in voltages {
             self.data.push_back(voltage);
+        }
+
+        self.accumulate_into_view_buffer(num_acc);
+        self.cache.clear();
+    }
+
+    pub fn update_power_from_remote(&mut self, remote_data: &mut RemoteData, num_acc: usize) {
+        let power_readings = remote_data.take_adc_readings();
+        let power_values: VecDeque<f32> = power_readings
+            .iter()
+            .map(|&power_reading| power_reading as f32)
+            .collect();
+        self.data.try_reserve(power_values.len()).ok();
+        for power_value in power_values {
+            self.data.push_back(power_value);
         }
 
         self.accumulate_into_view_buffer(num_acc);

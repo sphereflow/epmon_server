@@ -114,24 +114,24 @@ impl State {
             RemoteData::BatteryVoltage(_) => {
                 self.charts
                     .battery1
-                    .update_from_remote(&mut remote_data, time_interval.accumulations());
+                    .update_voltages_from_remote(&mut remote_data, time_interval.accumulations());
                 bupdate_battery2 = true;
             }
             RemoteData::BatteryPackVoltage(_) => {
                 self.charts
                     .battery_pack
-                    .update_from_remote(&mut remote_data, time_interval.accumulations());
+                    .update_voltages_from_remote(&mut remote_data, time_interval.accumulations());
                 bupdate_battery2 = true;
             }
             RemoteData::PVVoltage(_) => {
                 self.charts
                     .pv
-                    .update_from_remote(&mut remote_data, time_interval.accumulations());
+                    .update_voltages_from_remote(&mut remote_data, time_interval.accumulations());
             }
             RemoteData::PVPower(_) => {
                 self.charts
                     .pv_power
-                    .update_from_remote(&mut remote_data, time_interval.accumulations());
+                    .update_power_from_remote(&mut remote_data, time_interval.accumulations());
             }
             RemoteData::VoltageBufferSize(s) => self.voltage_buffer_size = s,
             RemoteData::VoltageIntervalms(interval) => {

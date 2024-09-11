@@ -215,4 +215,12 @@ impl RemoteData {
         *self = RemoteData::NoData;
         res
     }
+    pub fn take_power_readings(&mut self) -> Vec<u16> {
+        let mut res = Vec::new();
+        if let RemoteData::PVPower(v) = self {
+            res = std::mem::take(v);
+        }
+        *self = RemoteData::NoData;
+        res
+    }
 }
