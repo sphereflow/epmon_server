@@ -16,6 +16,7 @@ pub struct Server {
     connected: Arc<Mutex<bool>>,
     remote_data_sender: Sender<RemoteData>,
     server_message_receiver: Receiver<ServerMessage>,
+    retransmit_buffers: bool,
 }
 impl Server {
     pub fn new(
@@ -27,6 +28,7 @@ impl Server {
             connected,
             remote_data_sender,
             server_message_receiver,
+            retransmit_buffers: true,
         }
     }
 
@@ -57,7 +59,7 @@ impl Server {
         }
     }
 
-    fn connection_established(&self, tcp_stream: &mut TcpStream) -> Result<(), ServerError> {
+    fn connection_established(&mut self, tcp_stream: &mut TcpStream) -> Result<(), ServerError> {
         let remote_data_sender = &self.remote_data_sender;
         println!("connection established");
         if let Ok(intervalms) = RemoteData::read_interval_ms_voltage(tcp_stream) {
@@ -72,8 +74,11 @@ impl Server {
         let voltage_buffer_size = RemoteData::read_voltage_buffer_size(tcp_stream)?;
         remote_data_sender.send(voltage_buffer_size)?;
 
-        let command_bytes = command::Command::RetransmitBuffers.to_bytes();
-        tcp_stream.write_all(&command_bytes)?;
+        if self.retransmit_buffers {
+            let command_bytes = command::Command::RetransmitBuffers.to_bytes();
+            tcp_stream.write_all(&command_bytes)?;
+            self.retransmit_buffers = false;
+        }
         Ok(())
     }
 
