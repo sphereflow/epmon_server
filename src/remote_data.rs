@@ -48,7 +48,6 @@ impl RemoteData {
 
     pub fn read_pv_power(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
         tcp_stream.write_all(&Command::GetBuffer(BufferType::PVPower).to_bytes())?;
-        println!("getting power_data");
         let power_data = Self::read_buffer(tcp_stream)?;
         Ok(RemoteData::PVPower(power_data))
     }
@@ -60,7 +59,6 @@ impl RemoteData {
         if buffer_size == 0 {
             return Ok(Vec::new());
         }
-        println!("buffer_size: {}", buffer_size);
         let mut buf = vec![0; buffer_size];
         tcp_stream.read_exact(&mut buf)?;
         Ok(bytemuck::cast_slice(&buf).to_vec())

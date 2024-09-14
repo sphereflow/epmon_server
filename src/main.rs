@@ -59,6 +59,8 @@ pub enum Message {
     MaxTimeFineSelected(f32),
     MinVoltageSelected(f32),
     MaxVoltageSelected(f32),
+    MinIntegrationSubRange(f32),
+    MaxIntegrationSubRange(f32),
     FontLoaded(Result<(), font::Error>),
     AddressInput(String),
     ReadHoldings { register_address: u16, size: u8 },
@@ -107,31 +109,28 @@ impl State {
     }
 
     fn update_remote_data(&mut self, mut remote_data: RemoteData) {
-        let time_interval = self.charts.selected_time_interval;
         let mut bupdate_battery2 = false;
         match remote_data {
             RemoteData::NoData => {}
             RemoteData::BatteryVoltage(_) => {
                 self.charts
                     .battery1
-                    .update_voltages_from_remote(&mut remote_data, time_interval.accumulations());
+                    .update_voltages_from_remote(&mut remote_data);
                 bupdate_battery2 = true;
             }
             RemoteData::BatteryPackVoltage(_) => {
                 self.charts
                     .battery_pack
-                    .update_voltages_from_remote(&mut remote_data, time_interval.accumulations());
+                    .update_voltages_from_remote(&mut remote_data);
                 bupdate_battery2 = true;
             }
             RemoteData::PVVoltage(_) => {
-                self.charts
-                    .pv
-                    .update_voltages_from_remote(&mut remote_data, time_interval.accumulations());
+                self.charts.pv.update_voltages_from_remote(&mut remote_data);
             }
             RemoteData::PVPower(_) => {
                 self.charts
                     .pv_power
-                    .update_power_from_remote(&mut remote_data, 1);
+                    .update_power_from_remote(&mut remote_data);
             }
             RemoteData::VoltageBufferSize(s) => self.voltage_buffer_size = s,
             RemoteData::VoltageIntervalms(interval) => {
@@ -233,6 +232,12 @@ impl Application for State {
             Message::MinVoltageSelected(min_voltage) => {
                 self.charts.min_y = min_voltage;
                 self.charts.adjust_min_max_y();
+            }
+            Message::MinIntegrationSubRange(min) => {
+                self.charts.pv_power.integration_sub_range.start = min;
+            }
+            Message::MaxIntegrationSubRange(max) => {
+                self.charts.pv_power.integration_sub_range.end = max;
             }
             Message::PauseUnpause => self.charts.paused = !self.charts.paused,
             Message::AddressInput(s) => {

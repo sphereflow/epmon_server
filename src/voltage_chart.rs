@@ -8,6 +8,8 @@ use iced::*;
 use plotters_iced::{Chart, ChartWidget};
 use std::{collections::VecDeque, ops::Range};
 
+const NUM_DISPLAY_DATAPOINTS: f32 = 1000.0;
+
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum ChartType {
     #[default]
@@ -31,7 +33,9 @@ pub struct CustomChart {
     pub max_time: f32,
     /// indices into data for actually visible data
     pub data_range: Range<usize>,
-    /// time between 2 voltage measurements
+    /// to calculate energy consumed/produced bounded by [min_time, max_time]
+    pub integration_sub_range: Range<f32>,
+    /// time between 2 voltage measurements in seconds
     pub tick_len: f32,
     pub chart_type: ChartType,
 }
@@ -49,6 +53,7 @@ impl Default for CustomChart {
             min_time: -100.0,
             max_time: 0.0,
             data_range: (0..0),
+            integration_sub_range: (0.0..100.0),
             tick_len: 0.02,
             chart_type: Default::default(),
         }
@@ -56,7 +61,7 @@ impl Default for CustomChart {
 }
 
 impl CustomChart {
-    pub fn update_voltages_from_remote(&mut self, remote_data: &mut RemoteData, num_acc: usize) {
+    pub fn update_voltages_from_remote(&mut self, remote_data: &mut RemoteData) {
         let adc_readings = remote_data.take_adc_readings();
         let voltages: VecDeque<f32> = adc_readings
             .iter()
@@ -67,26 +72,37 @@ impl CustomChart {
             self.data.push_back(voltage);
         }
 
-        self.accumulate_into_view_buffer(num_acc);
+        self.accumulate_into_view_buffer();
         self.cache.clear();
     }
 
-    pub fn update_power_from_remote(&mut self, remote_data: &mut RemoteData, num_acc: usize) {
+    pub fn update_power_from_remote(&mut self, remote_data: &mut RemoteData) {
         let power_readings = remote_data.take_power_readings();
         let power_values: VecDeque<f32> = power_readings
             .iter()
             .map(|&power_reading| power_reading as f32)
             .collect();
-        if !power_values.is_empty() {
-            println!("new power values : {:?}", power_values);
-        }
         self.data.try_reserve(power_values.len()).ok();
         for power_value in power_values {
             self.data.push_back(power_value);
         }
 
-        self.accumulate_into_view_buffer(num_acc);
+        self.accumulate_into_view_buffer();
         self.cache.clear();
+    }
+
+    pub fn kilo_watt_hours(&self) -> f32 {
+        let integration_lower_ix =
+            self.index_for_time(self.integration_sub_range.start + self.min_time);
+        let integration_upper_ix =
+            self.index_for_time(self.integration_sub_range.end + self.min_time);
+        let res = self
+            .data
+            .range(integration_lower_ix..integration_upper_ix)
+            .sum::<f32>()
+            * self.tick_len;
+        // Ws => kWh
+        res / 3600000.0
     }
 
     fn update_data_range(&mut self) {
@@ -121,12 +137,14 @@ impl CustomChart {
         self.time_for_index(mid)
     }
 
-    pub fn accumulate_into_view_buffer(&mut self, num_acc: usize) {
+    pub fn accumulate_into_view_buffer(&mut self) {
         self.update_data_range();
         self.display_data.clear();
         let mut acc_voltage = 0.0;
         let mut acc_count = 1;
         let mut time = 0.0;
+        let num_data_points = self.data_range.end - self.data_range.start;
+        let num_acc = ((num_data_points as f32 / NUM_DISPLAY_DATAPOINTS) as usize).max(1);
         for (offset, val) in self.data.range(self.data_range.clone()).enumerate() {
             if acc_count == 1 {
                 time = self.range_time(
@@ -162,14 +180,7 @@ impl CustomChart {
         let interval_seconds = time_interval.to_seconds();
         self.max_time = self.max_time.min(0.0);
         self.min_time = self.max_time - interval_seconds;
-        match self.chart_type {
-            ChartType::Voltage => {
-                self.accumulate_into_view_buffer(time_interval.accumulations());
-            }
-            ChartType::Power => {
-                self.accumulate_into_view_buffer(1);
-            }
-        }
+        self.accumulate_into_view_buffer();
         self.cache.clear();
     }
 }
@@ -194,6 +205,7 @@ impl Chart<Message> for CustomChart {
     ) {
         use plotters::prelude::*;
         const PLOT_LINE_COLOR: RGBColor = RGBColor(0, 175, 255);
+        const INTEGRATION_LINE_COLOR: RGBColor = RGBColor(120, 50, 0);
 
         let y_unit_text = match self.chart_type {
             ChartType::Voltage => "V",
@@ -239,11 +251,43 @@ impl Chart<Message> for CustomChart {
         chart
             .draw_series(
                 AreaSeries::new(
-                    self.display_data.iter().cloned(),
+                    self.display_data
+                        .iter()
+                        .take_while(|x| x.0 < self.integration_sub_range.start + self.min_time)
+                        .cloned(),
                     0.0,
                     PLOT_LINE_COLOR.mix(0.175),
                 )
                 .border_style(ShapeStyle::from(PLOT_LINE_COLOR).stroke_width(2)),
+            )
+            .expect("failed to draw chart data");
+        chart
+            .draw_series(
+                AreaSeries::new(
+                    self.display_data
+                        .iter()
+                        .skip_while(|x| x.0 < self.integration_sub_range.end + self.min_time)
+                        .cloned(),
+                    0.0,
+                    PLOT_LINE_COLOR.mix(0.175),
+                )
+                .border_style(ShapeStyle::from(PLOT_LINE_COLOR).stroke_width(2)),
+            )
+            .expect("failed to draw chart data");
+        chart
+            .draw_series(
+                AreaSeries::new(
+                    self.display_data
+                        .iter()
+                        .filter(|x| {
+                            (x.0 >= self.integration_sub_range.start + self.min_time)
+                                && (x.0 <= self.integration_sub_range.end + self.min_time)
+                        })
+                        .cloned(),
+                    0.0,
+                    INTEGRATION_LINE_COLOR.mix(0.175),
+                )
+                .border_style(ShapeStyle::from(INTEGRATION_LINE_COLOR).stroke_width(2)),
             )
             .expect("failed to draw chart data");
     }

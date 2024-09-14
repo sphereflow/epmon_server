@@ -129,7 +129,7 @@ impl Realtime {
             load_power,
             battery_temperature: two_bytes_to_f32([bytes[20], bytes[21]]),
             equipment_temperature: two_bytes_to_f32([bytes[22], bytes[23]]),
-            remaining_battery_capacity: two_bytes_to_f32([bytes[24], bytes[25]]),
+            remaining_battery_capacity: two_bytes_to_f32([bytes[24], bytes[25]]) / 0.01,
             remote_battery_temperature: two_bytes_to_f32([bytes[26], bytes[27]]),
             battery_real_rated_power: two_bytes_to_f32([bytes[28], bytes[29]]),
         }

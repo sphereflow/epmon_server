@@ -246,6 +246,35 @@ impl AllCharts {
         }
         .on_press(Message::PauseUnpause);
 
+        let si = self.selected_time_interval.interval();
+        let i = *si.start()..=self.pv_power.integration_sub_range.end;
+        let min_sub_interval_slider = Slider::new(
+            i,
+            self.pv_power.integration_sub_range.start,
+            Message::MinIntegrationSubRange,
+        )
+        .width(200);
+        let i = self.pv_power.integration_sub_range.start..=*si.end();
+        let max_sub_interval_slider = Slider::new(
+            i,
+            self.pv_power.integration_sub_range.end,
+            Message::MaxIntegrationSubRange,
+        )
+        .width(200);
+
+        let integration_col = Column::new()
+            .push(min_sub_interval_slider)
+            .push(spacer())
+            .push(max_sub_interval_slider)
+            .push(Text::new(format!(
+                "{:.3} kWh",
+                self.pv_power.kilo_watt_hours()
+            )))
+            .push(Text::new(format!(
+                "{} s ..= {} s",
+                self.pv_power.integration_sub_range.start, self.pv_power.integration_sub_range.end
+            )));
+
         if self.chart_controls {
             control_row
                 .push(toggle_chart_controls)
@@ -270,6 +299,7 @@ impl AllCharts {
                 )))
                 .push(Space::new(30., 30.))
                 .push(pause_button)
+                .push(integration_col)
         } else {
             control_row.push(toggle_chart_controls)
         }
@@ -503,8 +533,7 @@ impl AllCharts {
             .zip(self.battery1.data.iter())
             .map(|(bp_voltage, b1_voltage)| bp_voltage - b1_voltage);
         self.battery2.data = voltages.collect();
-        self.battery2
-            .accumulate_into_view_buffer(self.selected_time_interval.accumulations());
+        self.battery2.accumulate_into_view_buffer();
     }
 
     pub fn adjust_time_interval(&mut self, time_interval: TimeInterval) {

@@ -1,3 +1,5 @@
+use std::ops::RangeInclusive;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TimeInterval {
     Second,
@@ -31,19 +33,7 @@ impl TimeInterval {
         }
     }
 
-    pub fn accumulations(self) -> usize {
-        match self {
-            TimeInterval::Second => 1,
-            TimeInterval::TenSeconds => 1,
-            TimeInterval::ThirtySeconds => 3,
-            TimeInterval::Minute => 6,
-            TimeInterval::FiveMinutes => 30,
-            TimeInterval::ThirtyMinutes => 180,
-            TimeInterval::Hour => 360,
-            TimeInterval::ThreeHours => 360 * 3,
-            TimeInterval::SixHours => 360 * 6,
-            TimeInterval::TwelveHours => 360 * 12,
-            TimeInterval::Day => 360 * 24,
-        }
+    pub fn interval(&self) -> RangeInclusive<f32> {
+        0.0..=self.to_seconds()
     }
 }
