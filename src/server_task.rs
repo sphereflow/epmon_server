@@ -36,6 +36,9 @@ impl Server {
         if let Ok(tcp_listener) = TcpListener::bind("0.0.0.0:8900") {
             for result in tcp_listener.incoming() {
                 let mut tcp_stream = result.expect("tcp_stream error");
+                tcp_stream
+                    .set_nodelay(true)
+                    .expect("could not set no_delay on tcp stream");
                 if let Ok(mut mgc) = self.connected.lock() {
                     *mgc = true;
                 }
@@ -62,6 +65,11 @@ impl Server {
     fn connection_established(&mut self, tcp_stream: &mut TcpStream) -> Result<(), ServerError> {
         let remote_data_sender = &self.remote_data_sender;
         println!("connection established");
+        println!("tcp_stream.read_timeout = {:?}", tcp_stream.read_timeout());
+        println!(
+            "tcp_stream.write_timeout = {:?}",
+            tcp_stream.write_timeout()
+        );
         if let Ok(intervalms) = RemoteData::read_interval_ms_voltage(tcp_stream) {
             println!("Interval : {intervalms:?} ms");
             remote_data_sender.send(intervalms).unwrap();
