@@ -127,6 +127,10 @@ impl Server {
                 ServerMessage::SetVoltageSettings(cs) => {
                     Self::send_command(cs.generate_set_command(), tcp_stream)?
                 }
+                ServerMessage::ReadLastLog => {
+                    let remote_data = RemoteData::get_last_log_message(tcp_stream)?;
+                    self.remote_data_sender.send(remote_data)?;
+                }
             }
         }
         thread::sleep(Duration::from_millis(500));
@@ -188,5 +192,6 @@ pub enum ServerMessage {
     ReadVoltageSettings,
     ReadRated,
     ReadStats,
+    ReadLastLog,
     SetVoltageSettings(VoltageSettings),
 }

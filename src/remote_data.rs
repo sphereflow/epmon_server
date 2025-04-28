@@ -25,6 +25,7 @@ pub enum RemoteData {
     VoltageSettings(VoltageSettings),
     Rated(Rated),
     Stats(Stats),
+    LastLogMessage(String),
 }
 
 impl RemoteData {
@@ -94,6 +95,22 @@ impl RemoteData {
         Ok(RemoteData::VoltageBufferSize(
             u32::from_be_bytes(read_buf) as usize
         ))
+    }
+
+    pub fn get_last_log_message(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
+        let write_buf = Command::GetLastLogMessage.to_bytes();
+        tcp_stream.write_all(&write_buf)?;
+        let mut size_buf = [0; 4];
+        tcp_stream.read_exact(&mut size_buf)?;
+        let buffer_size = u32::from_be_bytes(size_buf) as usize;
+        if buffer_size == 0 {
+            return Ok(RemoteData::LastLogMessage(String::new()));
+        }
+        let mut buf = vec![0; buffer_size];
+        tcp_stream.read_exact(&mut buf)?;
+        let res = String::from_utf8(buf)
+            .expect("get_last_log_message: failed to convert bytes to String");
+        Ok(RemoteData::LastLogMessage(res))
     }
 
     pub fn get_holdings(

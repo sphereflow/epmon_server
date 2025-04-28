@@ -163,6 +163,9 @@ impl State {
             RemoteData::Stats(stats) => {
                 self.charts.stats = stats;
             }
+            RemoteData::LastLogMessage(last_log) => {
+                self.charts.log.push(last_log);
+            }
         }
         if bupdate_battery2 {
             self.charts.update_battery2();

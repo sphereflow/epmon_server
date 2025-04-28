@@ -40,6 +40,7 @@ pub struct AllCharts {
     pub chart_controls: bool,
     pub paused: bool,
     pub connected: Arc<Mutex<bool>>,
+    pub log: Vec<String>,
 }
 
 impl Default for AllCharts {
@@ -99,6 +100,7 @@ impl Default for AllCharts {
             rated_data: Default::default(),
             stats: Default::default(),
             connected: Arc::new(Mutex::new(false)),
+            log: Vec::new(),
         }
     }
 }
@@ -110,6 +112,7 @@ impl AllCharts {
             .push(1, TabLabel::Text(String::from("Power Charts")))
             .push(2, TabLabel::Text(String::from("Stats")))
             .push(3, TabLabel::Text(String::from("Settings")))
+            .push(4, TabLabel::Text(String::from("Log")))
             .set_active_tab(&(self.selected_tab as i32));
 
         let connected = *self.connected.lock().expect("could not lock mutex");
@@ -123,6 +126,7 @@ impl AllCharts {
             SelectedTab::PowerCharts => self.view_power_charts(),
             SelectedTab::Stats => self.view_modbus(),
             SelectedTab::Settings => self.view_settings(),
+            SelectedTab::Log => self.view_log(),
         });
         Scrollable::new(
             Column::new()
@@ -505,6 +509,22 @@ impl AllCharts {
             .into()
     }
 
+    fn view_log(&self) -> Element<Message> {
+        let mut concatenated_log = String::new();
+        for line in self.log.iter() {
+            concatenated_log.push_str(line);
+            concatenated_log.push('\n');
+        }
+        let log_text = text(concatenated_log);
+        let scrollable_log_text = scrollable(log_text);
+        let get_log_button = Button::new("get last log line")
+            .on_press(Message::SendServerMessage(ServerMessage::ReadLastLog));
+        Column::new()
+            .push(scrollable_log_text)
+            .push(get_log_button)
+            .into()
+    }
+
     fn view_rated(&self) -> Element<Message> {
         let read_rated_button = Button::new("read rated").on_press(Message::ReadRated);
         let rated_text = Text::new(format!("{}", self.rated_data));
@@ -585,6 +605,7 @@ pub enum SelectedTab {
     PowerCharts,
     Stats,
     Settings,
+    Log,
 }
 
 fn spacer() -> Space {
