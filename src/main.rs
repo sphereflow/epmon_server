@@ -300,7 +300,9 @@ impl Application for State {
                 0 => self.charts.selected_tab = SelectedTab::VoltageCharts,
                 1 => self.charts.selected_tab = SelectedTab::PowerCharts,
                 2 => self.charts.selected_tab = SelectedTab::Stats,
-                _ => self.charts.selected_tab = SelectedTab::Settings,
+                3 => self.charts.selected_tab = SelectedTab::Settings,
+                4 => self.charts.selected_tab = SelectedTab::Log,
+                _ => panic!("can not determine selected tab"),
             },
             Message::ToggleChartControls => {
                 self.charts.chart_controls = !self.charts.chart_controls
