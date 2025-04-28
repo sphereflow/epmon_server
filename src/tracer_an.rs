@@ -398,27 +398,27 @@ impl ChargingEquipmentStatus {
 
     pub fn is_load_over_current(&self) -> bool {
         // is D9 (the 10th bit) set
-        (1 & (self.0) >> 9) != 0
+        (1 & (self.0 >> 9)) != 0
     }
 
     pub fn is_input_over_current(&self) -> bool {
         // is D10 (the 11th bit) set
-        (1 & (self.0) >> 10) != 0
+        (1 & (self.0 >> 10)) != 0
     }
 
     pub fn is_anti_reverse_mosfet_short(&self) -> bool {
         // is D11 (the 12th bit) set
-        (1 & (self.0) >> 11) != 0
+        (1 & (self.0 >> 11)) != 0
     }
 
     pub fn is_charging_or_anti_reverse_mosfet_short(&self) -> bool {
         // is D12 (the 13th bit) set
-        (1 & (self.0) >> 12) != 0
+        (1 & (self.0 >> 12)) != 0
     }
 
     pub fn is_charging_mosfet_short(&self) -> bool {
         // is D13 (the 14th bit) set
-        (1 & (self.0) >> 13) != 0
+        (1 & (self.0 >> 13)) != 0
     }
 }
 
@@ -552,17 +552,17 @@ impl DischargingEquipmentStatus {
 
     pub fn is_unable_to_stop_discharging(&self) -> bool {
         // is D9 (the 10th bit) set
-        (1 & (self.0) >> 9) != 0
+        (1 & (self.0 >> 9)) != 0
     }
 
     pub fn is_unable_to_discharge(&self) -> bool {
         // is D10 (the 11th bit) set
-        (1 & (self.0) >> 10) != 0
+        (1 & (self.0 >> 10)) != 0
     }
 
     pub fn is_short_circuit(&self) -> bool {
         // is D11 (the 12th bit) set
-        (1 & (self.0) >> 11) != 0
+        (1 & (self.0 >> 11)) != 0
     }
 }
 
