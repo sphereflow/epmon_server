@@ -20,7 +20,8 @@ pub struct AllCharts {
     pub battery_pack: CustomChart,
     pub pv: CustomChart,
     pub pv_power: CustomChart,
-    pub inverter_power: CustomChart,
+    pub inverter_input_power: CustomChart,
+    pub inverter_output_power: CustomChart,
     pub selected_time_interval: TimeInterval,
     pub time_correctness: f32,
     pub max_time_day: f32,
@@ -67,9 +68,15 @@ impl Default for AllCharts {
             chart_type: ChartType::Power,
             ..Default::default()
         };
-        let inverter_power = CustomChart {
-            title: "Inverter Power".to_string(),
-            max_y: 1200.0,
+        let inverter_input_power = CustomChart {
+            title: "Inverter Input Power".to_string(),
+            max_y: 3000.0,
+            chart_type: ChartType::Power,
+            ..Default::default()
+        };
+        let inverter_output_power = CustomChart {
+            title: "Inverter Output Power".to_string(),
+            max_y: 3000.0,
             chart_type: ChartType::Power,
             ..Default::default()
         };
@@ -80,7 +87,8 @@ impl Default for AllCharts {
             battery_pack,
             pv,
             pv_power,
-            inverter_power,
+            inverter_input_power,
+            inverter_output_power,
             selected_time_interval: Default::default(),
             max_time_day: 0.0,
             max_time: 0.0,
@@ -169,19 +177,28 @@ impl AllCharts {
 
     fn view_power_charts(&self) -> Element<Message> {
         let control_row = self.view_chart_controls();
-        let chart_row = Row::new()
+        let pv_row = Row::new()
             .spacing(15)
             .padding(20)
             .width(Length::Fill)
             .height(Length::Shrink)
             .align_items(Alignment::Center)
-            .push(self.pv_power.view(0, CHART_HEIGHT * 1.7));
+            .push(self.pv_power.view(0, CHART_HEIGHT));
+        let inverter_row = Row::new()
+            .spacing(15)
+            .padding(20)
+            .width(Length::Fill)
+            .height(Length::Shrink)
+            .align_items(Alignment::Center)
+            .push(self.inverter_input_power.view(0, CHART_HEIGHT))
+            .push(self.inverter_output_power.view(1, CHART_HEIGHT));
         Column::new()
             .width(Length::Fill)
             .height(Length::Shrink)
             .align_items(Alignment::Start)
             .push(control_row)
-            .push(chart_row)
+            .push(pv_row)
+            .push(inverter_row)
             .into()
     }
 
@@ -271,8 +288,16 @@ impl AllCharts {
             .push(spacer())
             .push(max_sub_interval_slider)
             .push(Text::new(format!(
-                "{:.3} kWh",
+                "pv: {:.3} kWh",
                 self.pv_power.kilo_watt_hours()
+            )))
+            .push(Text::new(format!(
+                "inverter in: {:.3} kWh",
+                self.inverter_input_power.kilo_watt_hours()
+            )))
+            .push(Text::new(format!(
+                "inverter out: {:.3} kWh",
+                self.inverter_output_power.kilo_watt_hours()
             )))
             .push(Text::new(format!(
                 "{} s ..= {} s",
@@ -573,13 +598,15 @@ impl AllCharts {
         self.battery_pack.min_y = 0.5 * self.min_y;
         self.pv.min_y = self.min_y;
         self.pv_power.min_y = self.min_y * 6.0;
-        self.inverter_power.min_y = self.min_y * 6.0;
+        self.inverter_input_power.min_y = self.min_y * 6.0;
+        self.inverter_output_power.min_y = self.min_y * 6.0;
         self.battery1.max_y = 0.25 * self.max_y;
         self.battery2.max_y = 0.25 * self.max_y;
         self.battery_pack.max_y = 0.5 * self.max_y;
         self.pv.max_y = self.max_y;
         self.pv_power.max_y = self.max_y * 6.0;
-        self.inverter_power.max_y = self.max_y * 6.0;
+        self.inverter_input_power.max_y = self.max_y * 10.0;
+        self.inverter_output_power.max_y = self.max_y * 10.0;
     }
 
     pub fn clear_caches(&mut self) {
@@ -593,7 +620,8 @@ impl AllCharts {
             &mut self.battery2,
             &mut self.pv,
             &mut self.pv_power,
-            &mut self.inverter_power,
+            &mut self.inverter_input_power,
+            &mut self.inverter_output_power,
         ]
         .map(f);
     }

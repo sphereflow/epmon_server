@@ -99,6 +99,10 @@ impl Server {
         self.remote_data_sender.send(pv_voltage)?;
         let pv_power = RemoteData::read_pv_power(tcp_stream)?;
         self.remote_data_sender.send(pv_power)?;
+        let inverter_input_power = RemoteData::read_inverter_input_power(tcp_stream)?;
+        self.remote_data_sender.send(inverter_input_power)?;
+        let inverter_output_power = RemoteData::read_inverter_output_power(tcp_stream)?;
+        self.remote_data_sender.send(inverter_output_power)?;
         while let Ok(message) = self.server_message_receiver.try_recv() {
             match message {
                 ServerMessage::Command(command) => {
@@ -133,7 +137,7 @@ impl Server {
                 }
             }
         }
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(Duration::from_millis(3000));
         Ok(())
     }
 
@@ -150,12 +154,12 @@ impl Server {
         tcp_stream: &mut TcpStream,
     ) -> Result<(), ServerError> {
         match command {
-            command::Command::ModbusGetHoldings { .. } => {
+            command::Command::ModbusTracerGetHoldings { .. } => {
                 let val = RemoteData::get_holdings(tcp_stream, command)?;
                 println!("holding val: {:?}", &val);
                 self.remote_data_sender.send(val)?;
             }
-            command::Command::ModbusGetInputRegisters { .. } => {
+            command::Command::ModbusTracerGetInputRegisters { .. } => {
                 println!("getting_input_registers");
                 let val = RemoteData::get_input_registers(tcp_stream, command)?;
                 println!("input reg val: {:?}", &val);

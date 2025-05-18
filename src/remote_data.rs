@@ -26,6 +26,8 @@ pub enum RemoteData {
     Rated(Rated),
     Stats(Stats),
     LastLogMessage(String),
+    InverterInputPower(Vec<u16>),
+    InverterOutputPower(Vec<u16>),
 }
 
 impl RemoteData {
@@ -51,6 +53,18 @@ impl RemoteData {
         tcp_stream.write_all(&Command::GetBuffer(BufferType::PVPower).to_bytes())?;
         let power_data = Self::read_buffer(tcp_stream)?;
         Ok(RemoteData::PVPower(power_data))
+    }
+
+    pub fn read_inverter_input_power(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
+        tcp_stream.write_all(&Command::GetBuffer(BufferType::InverterInputPower).to_bytes())?;
+        let power_data = Self::read_buffer(tcp_stream)?;
+        Ok(RemoteData::InverterInputPower(power_data))
+    }
+
+    pub fn read_inverter_output_power(tcp_stream: &mut TcpStream) -> std::io::Result<RemoteData> {
+        tcp_stream.write_all(&Command::GetBuffer(BufferType::InverterOutputPower).to_bytes())?;
+        let power_data = Self::read_buffer(tcp_stream)?;
+        Ok(RemoteData::InverterOutputPower(power_data))
     }
 
     pub fn read_buffer(tcp_stream: &mut TcpStream) -> std::io::Result<Vec<u16>> {
@@ -118,7 +132,7 @@ impl RemoteData {
         command: Command,
     ) -> std::io::Result<RemoteData> {
         let write_buf = command.to_bytes();
-        if let Command::ModbusGetHoldings {
+        if let Command::ModbusTracerGetHoldings {
             register_address: _,
             size,
         } = command
@@ -138,7 +152,7 @@ impl RemoteData {
     ) -> std::io::Result<RemoteData> {
         let write_buf = command.to_bytes();
         println!("Sending Command: {:?}", command);
-        if let Command::ModbusGetInputRegisters {
+        if let Command::ModbusTracerGetInputRegisters {
             register_address: _,
             size,
         } = command
@@ -239,10 +253,25 @@ impl RemoteData {
     }
     pub fn take_power_readings(&mut self) -> Vec<u16> {
         let mut res = Vec::new();
-        if let RemoteData::PVPower(v) = self {
-            res = std::mem::take(v);
+        match self {
+            RemoteData::PVPower(items)
+            | RemoteData::InverterInputPower(items)
+            | RemoteData::InverterOutputPower(items) => res = std::mem::take(items),
+            _ => {}
         }
         *self = RemoteData::NoData;
         res
+    }
+
+    pub fn buf_len(&self) -> usize {
+        match self {
+            RemoteData::BatteryVoltage(items) => items.len(),
+            RemoteData::BatteryPackVoltage(items) => items.len(),
+            RemoteData::PVVoltage(items) => items.len(),
+            RemoteData::PVPower(items) => items.len(),
+            RemoteData::InverterInputPower(items) => items.len(),
+            RemoteData::InverterOutputPower(items) => items.len(),
+            _ => 0,
+        }
     }
 }

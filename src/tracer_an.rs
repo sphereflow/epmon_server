@@ -45,11 +45,11 @@ impl Rated {
 
     pub fn generate_commands() -> [Command; 2] {
         [
-            Command::ModbusGetInputRegisters {
+            Command::ModbusTracerGetInputRegisters {
                 register_address: RATED_BASE_ADDRESS,
                 size: 9,
             },
-            Command::ModbusGetInputRegisters {
+            Command::ModbusTracerGetInputRegisters {
                 register_address: RATED_BASE_ADDRESS + 0x0E,
                 size: 1,
             },
@@ -141,23 +141,23 @@ impl Realtime {
 
     pub fn generate_commands() -> [Command; 5] {
         [
-            Command::ModbusGetInputRegisters {
+            Command::ModbusTracerGetInputRegisters {
                 register_address: REALTIME_BASE_ADDRESS,
                 size: 4,
             },
-            Command::ModbusGetInputRegisters {
+            Command::ModbusTracerGetInputRegisters {
                 register_address: REALTIME_BASE_ADDRESS + 0x06,
                 size: 2,
             },
-            Command::ModbusGetInputRegisters {
+            Command::ModbusTracerGetInputRegisters {
                 register_address: REALTIME_BASE_ADDRESS + 0x0C,
                 size: 6,
             },
-            Command::ModbusGetInputRegisters {
+            Command::ModbusTracerGetInputRegisters {
                 register_address: REALTIME_BASE_ADDRESS + 0x1A,
                 size: 2,
             },
-            Command::ModbusGetInputRegisters {
+            Command::ModbusTracerGetInputRegisters {
                 register_address: REALTIME_BASE_ADDRESS + 0x1D,
                 size: 1,
             },
@@ -200,7 +200,7 @@ impl Display for Realtime {
 }
 
 // [b0, b1, b2, b3] => u32 => f32 => / 100
-fn four_bytes_to_f32([b0, b1, b2, b3]: [u8; 4]) -> f32 {
+pub fn four_bytes_to_f32([b0, b1, b2, b3]: [u8; 4]) -> f32 {
     let integer: u32 = u32::from_be_bytes([b2, b3, b0, b1]);
     (integer as f32) / 100.0
 }
@@ -269,7 +269,7 @@ impl RealtimeStatus {
     }
 
     pub fn generate_command() -> Command {
-        Command::ModbusGetInputRegisters {
+        Command::ModbusTracerGetInputRegisters {
             register_address: REALTIME_STATUS_BASE_ADDRESS,
             size: 3,
         }
@@ -729,11 +729,11 @@ impl Stats {
 
     pub fn generate_get_commands() -> [Command; 2] {
         [
-            Command::ModbusGetInputRegisters {
+            Command::ModbusTracerGetInputRegisters {
                 register_address: STATS_BASE_ADDRESS,
                 size: 20,
             },
-            Command::ModbusGetInputRegisters {
+            Command::ModbusTracerGetInputRegisters {
                 register_address: STATS_BASE_ADDRESS + 26,
                 size: 3,
             },
@@ -850,7 +850,7 @@ impl VoltageSettings {
     }
 
     pub fn generate_get_command() -> Command {
-        Command::ModbusGetHoldings {
+        Command::ModbusTracerGetHoldings {
             register_address: VOLTAGE_SETTINGS_BASE_ADDRESS,
             size: 15,
         }
@@ -874,7 +874,7 @@ impl VoltageSettings {
             (self.low_voltage_disconnect_voltage / 0.01) as u16,
             (self.discharging_limit_voltage / 0.01) as u16,
         ];
-        Command::ModbusSetHoldings {
+        Command::ModbusTracerSetHoldings {
             register_address: VOLTAGE_SETTINGS_BASE_ADDRESS,
             new_holding_values: bytes,
         }

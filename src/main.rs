@@ -18,6 +18,7 @@ use udp_broadcast_task::udp_broadcast;
 
 pub mod all_charts;
 pub mod command;
+pub mod inverter;
 pub mod remote_data;
 pub mod server_task;
 pub mod time_interval;
@@ -132,6 +133,16 @@ impl State {
                     .pv_power
                     .update_power_from_remote(&mut remote_data);
             }
+            RemoteData::InverterInputPower(_) => {
+                self.charts
+                    .inverter_input_power
+                    .update_power_from_remote(&mut remote_data);
+            }
+            RemoteData::InverterOutputPower(_) => {
+                self.charts
+                    .inverter_output_power
+                    .update_power_from_remote(&mut remote_data);
+            }
             RemoteData::VoltageBufferSize(s) => self.voltage_buffer_size = s,
             RemoteData::VoltageIntervalms(interval) => {
                 let tick_len = interval as f32 / 1000.0;
@@ -144,7 +155,8 @@ impl State {
                 let tick_len = interval as f32 / 1000.0;
                 println!("power chart tick_len : {}", tick_len);
                 self.charts.pv_power.tick_len = tick_len;
-                self.charts.inverter_power.tick_len = tick_len;
+                self.charts.inverter_input_power.tick_len = tick_len;
+                self.charts.inverter_output_power.tick_len = tick_len;
             }
             RemoteData::Holdings(val) | RemoteData::InputRegisters(val) => {
                 self.charts.modbus_val = val;
@@ -254,7 +266,7 @@ impl Application for State {
                 size,
             } => {
                 self.server_message_sender
-                    .send(ServerMessage::Command(Command::ModbusGetHoldings {
+                    .send(ServerMessage::Command(Command::ModbusTracerGetHoldings {
                         register_address,
                         size,
                     }))
@@ -265,10 +277,12 @@ impl Application for State {
                 size,
             } => {
                 self.server_message_sender
-                    .send(ServerMessage::Command(Command::ModbusGetInputRegisters {
-                        register_address,
-                        size,
-                    }))
+                    .send(ServerMessage::Command(
+                        Command::ModbusTracerGetInputRegisters {
+                            register_address,
+                            size,
+                        },
+                    ))
                     .expect("command_sender: could not send command");
             }
             Message::ReadRealtime => {
