@@ -250,9 +250,16 @@ impl Application for State {
             }
             Message::MinIntegrationSubRange(min) => {
                 self.charts.pv_power.integration_sub_range.start = min;
+                self.charts.inverter_input_power.integration_sub_range.start = min;
+                self.charts
+                    .inverter_output_power
+                    .integration_sub_range
+                    .start = min;
             }
             Message::MaxIntegrationSubRange(max) => {
                 self.charts.pv_power.integration_sub_range.end = max;
+                self.charts.inverter_input_power.integration_sub_range.end = max;
+                self.charts.inverter_output_power.integration_sub_range.end = max;
             }
             Message::PauseUnpause => self.charts.paused = !self.charts.paused,
             Message::AddressInput(s) => {
