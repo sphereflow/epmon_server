@@ -1,9 +1,9 @@
 use all_charts::{AllCharts, SelectedTab};
 use command::Command;
 use iced::{
-    executor, font,
+    font,
     widget::{Column, Container},
-    Alignment, Application, Length, Settings, Subscription,
+    Alignment, Length, Subscription,
 };
 use remote_data::RemoteData;
 use server_task::{Server, ServerMessage};
@@ -39,16 +39,16 @@ fn main() {
     thread::spawn(move || {
         Server::run(Server::new(connected, remote_data_sender, command_receiver))
     });
-    State::run(Settings {
-        flags: (remote_data_receiver, command_sender, connected_main_app),
-        id: Default::default(),
-        window: Default::default(),
-        fonts: Default::default(),
-        default_font: Default::default(),
-        default_text_size: iced::Pixels(16.0),
-        antialiasing: Default::default(),
-    })
-    .expect("Error: State::run");
+    iced::application("EpMon Server", update, view)
+        .subscription(subscription)
+        .theme(|_state| iced::theme::Theme::GruvboxDark)
+        .run_with(|| {
+            (
+                State::new(remote_data_receiver, command_sender, connected_main_app),
+                iced::Task::none(),
+            )
+        })
+        .expect("Could not start iced application");
 }
 
 #[derive(Debug, Clone)]
@@ -99,6 +99,23 @@ struct State {
 }
 
 impl State {
+    fn new(
+        remote_data_receiver: Receiver<RemoteData>,
+        command_sender: Sender<ServerMessage>,
+        connected: Arc<Mutex<bool>>,
+    ) -> Self {
+        Self {
+            charts: AllCharts {
+                connected,
+                ..Default::default()
+            },
+            start_instant: Instant::now(),
+            voltage_buffer_size: 0,
+            remote_data_receiver,
+            server_message_sender: command_sender,
+        }
+    }
+
     fn tick_update(&mut self) {
         // receive all the remote data in the channel in a loop
         while let Ok(remote_data) = self.remote_data_receiver.try_recv() {
@@ -185,279 +202,253 @@ impl State {
     }
 }
 
-impl Application for State {
-    type Executor = executor::Default;
-
-    type Message = Message;
-
-    type Theme = iced::Theme;
-
-    type Flags = (
-        Receiver<RemoteData>,
-        Sender<ServerMessage>,
-        Arc<Mutex<bool>>,
-    );
-
-    fn new(
-        (remote_data_receiver, command_sender, connected): Self::Flags,
-    ) -> (Self, iced::Command<Self::Message>) {
-        (
-            Self {
-                charts: AllCharts {
-                    connected,
-                    ..Default::default()
-                },
-                start_instant: Instant::now(),
-                voltage_buffer_size: 0,
-                remote_data_receiver,
-                server_message_sender: command_sender,
-            },
-            iced::Command::none(),
-        )
-    }
-
-    fn title(&self) -> String {
-        "EpMon Server".to_string()
-    }
-
-    fn theme(&self) -> iced::Theme {
-        iced::Theme::GruvboxDark
-    }
-
-    fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
-        match message {
-            Message::Tick => self.tick_update(),
-            Message::TimeIntervallSelected(interval) => self.charts.adjust_time_interval(interval),
-            Message::MaxTimeDaySelected(t) => {
-                self.charts.max_time_day = t;
-                self.charts.adjust_max_time();
+fn update(state: &mut State, message: Message) {
+    match message {
+        Message::Tick => state.tick_update(),
+        Message::TimeIntervallSelected(interval) => state.charts.adjust_time_interval(interval),
+        Message::MaxTimeDaySelected(t) => {
+            state.charts.max_time_day = t;
+            state.charts.adjust_max_time();
+        }
+        Message::MaxTimeSelected(t) => {
+            state.charts.max_time = t;
+            state.charts.adjust_max_time();
+        }
+        Message::MaxTimeFineSelected(t) => {
+            state.charts.max_time_fine = t;
+            state.charts.adjust_max_time();
+        }
+        Message::MaxVoltageSelected(max_voltage) => {
+            state.charts.max_y = max_voltage;
+            state.charts.adjust_min_max_y();
+        }
+        Message::MinVoltageSelected(min_voltage) => {
+            state.charts.min_y = min_voltage;
+            state.charts.adjust_min_max_y();
+        }
+        Message::MinIntegrationSubRange(min) => {
+            state.charts.pv_power.integration_sub_range.start = min;
+            state
+                .charts
+                .inverter_input_power
+                .integration_sub_range
+                .start = min;
+            state
+                .charts
+                .inverter_output_power
+                .integration_sub_range
+                .start = min;
+        }
+        Message::MaxIntegrationSubRange(max) => {
+            state.charts.pv_power.integration_sub_range.end = max;
+            state.charts.inverter_input_power.integration_sub_range.end = max;
+            state.charts.inverter_output_power.integration_sub_range.end = max;
+        }
+        Message::PauseUnpause => state.charts.paused = !state.charts.paused,
+        Message::AddressInput(s) => {
+            if let Ok(address) = u16::from_str_radix(&s, 16) {
+                state.charts.register_address = address;
+                state.charts.register_address_string = s;
             }
-            Message::MaxTimeSelected(t) => {
-                self.charts.max_time = t;
-                self.charts.adjust_max_time();
-            }
-            Message::MaxTimeFineSelected(t) => {
-                self.charts.max_time_fine = t;
-                self.charts.adjust_max_time();
-            }
-            Message::MaxVoltageSelected(max_voltage) => {
-                self.charts.max_y = max_voltage;
-                self.charts.adjust_min_max_y();
-            }
-            Message::MinVoltageSelected(min_voltage) => {
-                self.charts.min_y = min_voltage;
-                self.charts.adjust_min_max_y();
-            }
-            Message::MinIntegrationSubRange(min) => {
-                self.charts.pv_power.integration_sub_range.start = min;
-                self.charts.inverter_input_power.integration_sub_range.start = min;
-                self.charts
-                    .inverter_output_power
-                    .integration_sub_range
-                    .start = min;
-            }
-            Message::MaxIntegrationSubRange(max) => {
-                self.charts.pv_power.integration_sub_range.end = max;
-                self.charts.inverter_input_power.integration_sub_range.end = max;
-                self.charts.inverter_output_power.integration_sub_range.end = max;
-            }
-            Message::PauseUnpause => self.charts.paused = !self.charts.paused,
-            Message::AddressInput(s) => {
-                if let Ok(address) = u16::from_str_radix(&s, 16) {
-                    self.charts.register_address = address;
-                    self.charts.register_address_string = s;
-                }
-            }
-            Message::ReadHoldings {
-                register_address,
-                size,
-            } => {
-                self.server_message_sender
-                    .send(ServerMessage::Command(Command::ModbusTracerGetHoldings {
+        }
+        Message::ReadHoldings {
+            register_address,
+            size,
+        } => {
+            state
+                .server_message_sender
+                .send(ServerMessage::Command(Command::ModbusTracerGetHoldings {
+                    register_address,
+                    size,
+                }))
+                .expect("command_sender: could not send command");
+        }
+        Message::ReadRegisters {
+            register_address,
+            size,
+        } => {
+            state
+                .server_message_sender
+                .send(ServerMessage::Command(
+                    Command::ModbusTracerGetInputRegisters {
                         register_address,
                         size,
-                    }))
-                    .expect("command_sender: could not send command");
-            }
-            Message::ReadRegisters {
-                register_address,
-                size,
-            } => {
-                self.server_message_sender
-                    .send(ServerMessage::Command(
-                        Command::ModbusTracerGetInputRegisters {
-                            register_address,
-                            size,
-                        },
-                    ))
-                    .expect("command_sender: could not send command");
-            }
-            Message::ReadRealtime => {
-                self.server_message_sender
-                    .send(ServerMessage::ReadRealtime)
-                    .expect("command sender: could not send command");
-            }
-            Message::ReadRealtimeStatus => {
-                self.server_message_sender
-                    .send(ServerMessage::ReadRealtimeStatus)
-                    .expect("command sender: could not send command");
-            }
-            Message::ReadVoltageSettings => {
-                self.server_message_sender
-                    .send(ServerMessage::ReadVoltageSettings)
-                    .expect("command sender: could not send command");
-            }
-            Message::ReadRated => {
-                self.server_message_sender
-                    .send(ServerMessage::ReadRated)
-                    .expect("command sender: could not send command");
-            }
-            Message::ReadStats => {
-                self.server_message_sender
-                    .send(ServerMessage::ReadStats)
-                    .expect("command sender: could not send command");
-            }
-            Message::TabSelected(ix) => match ix {
-                0 => self.charts.selected_tab = SelectedTab::VoltageCharts,
-                1 => self.charts.selected_tab = SelectedTab::PowerCharts,
-                2 => self.charts.selected_tab = SelectedTab::Stats,
-                3 => self.charts.selected_tab = SelectedTab::Settings,
-                4 => self.charts.selected_tab = SelectedTab::Log,
-                _ => panic!("can not determine selected tab"),
-            },
-            Message::ToggleChartControls => {
-                self.charts.chart_controls = !self.charts.chart_controls
-            }
-            Message::BatteryTypeSelected(battery_type) => {
-                self.charts.change_voltage_settings.battery_type = battery_type;
-            }
-            Message::InputOverVoltageDisconnect(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts.change_voltage_settings.over_voltage_disconnect = f;
-                }
-            }
-            Message::InputChargingLimitVoltage(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts.change_voltage_settings.charging_limit_voltage = f;
-                }
-            }
-
-            Message::InputOverVoltageReconnect(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts.change_voltage_settings.over_voltage_reconnect = f;
-                }
-            }
-
-            Message::InputEqualizationVoltage(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts.change_voltage_settings.equalization_voltage = f;
-                }
-            }
-
-            Message::InputBoostVoltage(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts.change_voltage_settings.boost_voltage = f;
-                }
-            }
-
-            Message::InputFloatVoltage(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts.change_voltage_settings.float_voltage = f;
-                }
-            }
-
-            Message::InputBoostReconnectVoltage(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts.change_voltage_settings.boost_reconnect_voltage = f;
-                }
-            }
-
-            Message::InputLowVoltageReconnectVoltage(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts
-                        .change_voltage_settings
-                        .low_voltage_reconnect_voltage = f;
-                }
-            }
-
-            Message::InputUnderVoltageRecoverVoltage(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts
-                        .change_voltage_settings
-                        .under_voltage_recover_voltage = f;
-                }
-            }
-
-            Message::InputUnderVoltageWarningVoltage(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts
-                        .change_voltage_settings
-                        .under_voltage_warning_voltage = f;
-                }
-            }
-
-            Message::InputLowVoltageDisconnectVoltage(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts
-                        .change_voltage_settings
-                        .low_voltage_disconnect_voltage = f;
-                }
-            }
-
-            Message::InputDischargingLimitVoltage(s) => {
-                if let Ok(f) = s.parse::<f32>() {
-                    let f = (f / 0.01).round() / 100.0;
-                    self.charts
-                        .change_voltage_settings
-                        .discharging_limit_voltage = f;
-                }
-            }
-            Message::SendServerMessage(message) => self
+                    },
+                ))
+                .expect("command_sender: could not send command");
+        }
+        Message::ReadRealtime => {
+            state
                 .server_message_sender
-                .send(message)
-                .expect("could not send server message"),
-
-            Message::FontLoaded(_) => {}
+                .send(ServerMessage::ReadRealtime)
+                .expect("command sender: could not send command");
         }
-        self.charts.clear_caches();
-        iced::Command::none()
-    }
-
-    fn view(&self) -> iced::Element<'_, Self::Message, Self::Theme, iced::Renderer> {
-        let content = Column::new()
-            .spacing(20)
-            .align_items(Alignment::Start)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .push(self.charts.view());
-
-        Container::new(content)
-            //.style(style::Container)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .padding(5)
-            .center_x()
-            .center_y()
-            .into()
-    }
-
-    fn subscription(&self) -> Subscription<Self::Message> {
-        if !self.charts.paused {
-            iced::time::every(iced::time::Duration::from_millis(100)).map(|_| Message::Tick)
-        } else {
-            Subscription::none()
+        Message::ReadRealtimeStatus => {
+            state
+                .server_message_sender
+                .send(ServerMessage::ReadRealtimeStatus)
+                .expect("command sender: could not send command");
         }
+        Message::ReadVoltageSettings => {
+            state
+                .server_message_sender
+                .send(ServerMessage::ReadVoltageSettings)
+                .expect("command sender: could not send command");
+        }
+        Message::ReadRated => {
+            state
+                .server_message_sender
+                .send(ServerMessage::ReadRated)
+                .expect("command sender: could not send command");
+        }
+        Message::ReadStats => {
+            state
+                .server_message_sender
+                .send(ServerMessage::ReadStats)
+                .expect("command sender: could not send command");
+        }
+        Message::TabSelected(ix) => match ix {
+            0 => state.charts.selected_tab = SelectedTab::VoltageCharts,
+            1 => state.charts.selected_tab = SelectedTab::PowerCharts,
+            2 => state.charts.selected_tab = SelectedTab::Stats,
+            3 => state.charts.selected_tab = SelectedTab::Settings,
+            4 => state.charts.selected_tab = SelectedTab::Log,
+            _ => panic!("can not determine selected tab"),
+        },
+        Message::ToggleChartControls => state.charts.chart_controls = !state.charts.chart_controls,
+        Message::BatteryTypeSelected(battery_type) => {
+            state.charts.change_voltage_settings.battery_type = battery_type;
+        }
+        Message::InputOverVoltageDisconnect(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state.charts.change_voltage_settings.over_voltage_disconnect = f;
+            }
+        }
+        Message::InputChargingLimitVoltage(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state.charts.change_voltage_settings.charging_limit_voltage = f;
+            }
+        }
+
+        Message::InputOverVoltageReconnect(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state.charts.change_voltage_settings.over_voltage_reconnect = f;
+            }
+        }
+
+        Message::InputEqualizationVoltage(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state.charts.change_voltage_settings.equalization_voltage = f;
+            }
+        }
+
+        Message::InputBoostVoltage(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state.charts.change_voltage_settings.boost_voltage = f;
+            }
+        }
+
+        Message::InputFloatVoltage(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state.charts.change_voltage_settings.float_voltage = f;
+            }
+        }
+
+        Message::InputBoostReconnectVoltage(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state.charts.change_voltage_settings.boost_reconnect_voltage = f;
+            }
+        }
+
+        Message::InputLowVoltageReconnectVoltage(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state
+                    .charts
+                    .change_voltage_settings
+                    .low_voltage_reconnect_voltage = f;
+            }
+        }
+
+        Message::InputUnderVoltageRecoverVoltage(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state
+                    .charts
+                    .change_voltage_settings
+                    .under_voltage_recover_voltage = f;
+            }
+        }
+
+        Message::InputUnderVoltageWarningVoltage(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state
+                    .charts
+                    .change_voltage_settings
+                    .under_voltage_warning_voltage = f;
+            }
+        }
+
+        Message::InputLowVoltageDisconnectVoltage(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state
+                    .charts
+                    .change_voltage_settings
+                    .low_voltage_disconnect_voltage = f;
+            }
+        }
+
+        Message::InputDischargingLimitVoltage(s) => {
+            if let Ok(f) = s.parse::<f32>() {
+                let f = (f / 0.01).round() / 100.0;
+                state
+                    .charts
+                    .change_voltage_settings
+                    .discharging_limit_voltage = f;
+            }
+        }
+        Message::SendServerMessage(message) => state
+            .server_message_sender
+            .send(message)
+            .expect("could not send server message"),
+
+        Message::FontLoaded(_) => {}
+    }
+    state.charts.clear_caches();
+}
+
+fn view(state: &State) -> iced::Element<Message> {
+    let content = Column::new()
+        .spacing(20)
+        .align_x(Alignment::Start)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .push(state.charts.view());
+
+    Container::new(content)
+        //.style(style::Container)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding(5)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .into()
+}
+
+fn subscription(state: &State) -> Subscription<Message> {
+    if !state.charts.paused {
+        iced::time::every(iced::time::Duration::from_millis(100)).map(|_| Message::Tick)
+    } else {
+        Subscription::none()
     }
 }
 

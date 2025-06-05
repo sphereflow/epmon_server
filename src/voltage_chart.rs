@@ -170,7 +170,7 @@ impl CustomChart {
             .width(Length::Fill)
             .height(Length::Shrink)
             .spacing(5)
-            .align_items(Alignment::Center)
+            .align_x(Alignment::Center)
             .push(Text::new(self.title.clone()))
             .push(ChartWidget::new(self).height(Length::Fixed(chart_height)))
             .into()
