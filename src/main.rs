@@ -463,5 +463,5 @@ fn subscription(state: &State) -> Subscription<Message> {
 }
 
 fn adc_reading_to_voltage(adc_reading: u16) -> f32 {
-    (20700.0 / 124.0) * 1.1 * adc_reading as f32 / 4081.0
+    (20700.0 / 124.0) * 1.1751 * adc_reading as f32 / 4081.0
 }

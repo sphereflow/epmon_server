@@ -749,7 +749,7 @@ impl Display for Stats {
         writeln!(
             f,
             "    min_battery_voltage_day: {} V",
-            self.max_pv_voltage_day()
+            self.min_battery_voltage_day()
         )?;
         writeln!(
             f,
