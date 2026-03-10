@@ -82,7 +82,7 @@ impl Default for AllCharts {
             chart_type: ChartType::Power,
             ..Default::default()
         };
-        AllCharts {
+        let mut all_charts = AllCharts {
             selected_tab: SelectedTab::VoltageCharts,
             battery1,
             battery2,
@@ -112,12 +112,14 @@ impl Default for AllCharts {
             inverter_stats: Default::default(),
             connected: Arc::new(Mutex::new(false)),
             log: Vec::new(),
-        }
+        };
+        all_charts.adjust_min_max_y();
+        all_charts
     }
 }
 
 impl AllCharts {
-    pub fn view(&self) -> Element<Message> {
+    pub fn view(&self) -> Element<'_, Message> {
         let tab_bar = TabBar::new(Message::TabSelected)
             .push(0, TabLabel::Text(String::from("Voltage Charts")))
             .push(1, TabLabel::Text(String::from("Power Charts")))
@@ -149,7 +151,7 @@ impl AllCharts {
         .into()
     }
 
-    fn view_voltage_charts(&self) -> Element<Message> {
+    fn view_voltage_charts(&self) -> Element<'_, Message> {
         let control_row = self.view_chart_controls();
         let row1 = Row::new()
             .spacing(15)
@@ -178,7 +180,7 @@ impl AllCharts {
             .into()
     }
 
-    fn view_power_charts(&self) -> Element<Message> {
+    fn view_power_charts(&self) -> Element<'_, Message> {
         let control_row = self.view_chart_controls();
         let pv_row = Row::new()
             .spacing(15)
@@ -205,7 +207,7 @@ impl AllCharts {
             .into()
     }
 
-    fn view_chart_controls(&self) -> Row<Message> {
+    fn view_chart_controls(&self) -> Row<'_, Message> {
         let selected = self.selected_time_interval;
         let control_row = Row::new();
         let toggle_chart_controls = Button::new(if self.chart_controls { "-" } else { "+" })
@@ -337,7 +339,7 @@ impl AllCharts {
         }
     }
 
-    fn view_modbus(&self) -> Element<Message> {
+    fn view_modbus(&self) -> Element<'_, Message> {
         let register_text_input = text_input(
             "enter address of holding/register",
             &self.register_address_string,
@@ -406,14 +408,14 @@ impl AllCharts {
             .into()
     }
 
-    fn view_settings(&self) -> Element<Message> {
+    fn view_settings(&self) -> Element<'_, Message> {
         Row::new()
             .push(spacer())
             .push(self.view_voltage_settings())
             .into()
     }
 
-    fn view_voltage_settings(&self) -> Element<Message> {
+    fn view_voltage_settings(&self) -> Element<'_, Message> {
         let s = self.voltage_settings;
         let cs = self.change_voltage_settings;
         let get_voltage_settings_button =
@@ -542,7 +544,7 @@ impl AllCharts {
             .into()
     }
 
-    fn view_log(&self) -> Element<Message> {
+    fn view_log(&self) -> Element<'_, Message> {
         let mut concatenated_log = String::new();
         for line in self.log.iter() {
             concatenated_log.push_str(line);
@@ -558,7 +560,7 @@ impl AllCharts {
             .into()
     }
 
-    fn view_rated(&self) -> Element<Message> {
+    fn view_rated(&self) -> Element<'_, Message> {
         let read_rated_button = Button::new("read rated").on_press(Message::ReadRated);
         let rated_text = Text::new(format!("{}", self.rated_data));
         Column::new()
@@ -568,7 +570,7 @@ impl AllCharts {
             .into()
     }
 
-    fn view_stats(&self) -> Element<Message> {
+    fn view_stats(&self) -> Element<'_, Message> {
         let read_stats_button = Button::new("read stats").on_press(Message::ReadStats);
         let stats_text = Text::new(format!("{}", self.stats));
         Column::new()
@@ -601,37 +603,34 @@ impl AllCharts {
     }
 
     pub fn adjust_min_max_y(&mut self) {
-        self.battery1.min_y = 0.25 * self.min_y;
-        self.battery2.min_y = 0.25 * self.min_y;
-        self.battery_pack.min_y = 0.5 * self.min_y;
+        self.battery1.min_y = 0.15 * self.min_y;
+        self.battery1.max_y = 0.15 * self.max_y;
+        self.battery2.min_y = 0.15 * self.min_y;
+        self.battery2.max_y = 0.15 * self.max_y;
+        self.battery_pack.min_y = 0.35 * self.min_y;
+        self.battery_pack.max_y = 0.35 * self.max_y;
         self.pv.min_y = self.min_y;
-        self.pv_power.min_y = self.min_y * 6.0;
-        self.inverter_input_power.min_y = self.min_y * 6.0;
-        self.inverter_output_power.min_y = self.min_y * 6.0;
-        self.battery1.max_y = 0.25 * self.max_y;
-        self.battery2.max_y = 0.25 * self.max_y;
-        self.battery_pack.max_y = 0.5 * self.max_y;
         self.pv.max_y = self.max_y;
+        self.pv_power.min_y = self.min_y * 6.0;
         self.pv_power.max_y = self.max_y * 6.0;
-        self.inverter_input_power.max_y = self.max_y * 10.0;
-        self.inverter_output_power.max_y = self.max_y * 10.0;
+        self.inverter_input_power.min_y = self.min_y * 6.0;
+        self.inverter_input_power.max_y = self.max_y * 6.0;
+        self.inverter_output_power.min_y = self.min_y * 6.0;
+        self.inverter_output_power.max_y = self.max_y * 6.0;
     }
 
     pub fn clear_caches(&mut self) {
-        self.map_charts(|vc| vc.cache.clear());
+        self.map_charts(|chart| chart.cache.clear());
     }
 
-    fn map_charts<F: FnMut(&mut CustomChart)>(&mut self, f: F) {
-        [
-            &mut self.battery_pack,
-            &mut self.battery1,
-            &mut self.battery2,
-            &mut self.pv,
-            &mut self.pv_power,
-            &mut self.inverter_input_power,
-            &mut self.inverter_output_power,
-        ]
-        .map(f);
+    fn map_charts<F: FnMut(&mut CustomChart)>(&mut self, mut f: F) {
+        f(&mut self.battery_pack);
+        f(&mut self.battery1);
+        f(&mut self.battery2);
+        f(&mut self.pv);
+        f(&mut self.pv_power);
+        f(&mut self.inverter_input_power);
+        f(&mut self.inverter_output_power);
     }
 }
 

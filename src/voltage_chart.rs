@@ -165,7 +165,7 @@ impl CustomChart {
         }
     }
 
-    pub fn view(&self, _idx: usize, chart_height: f32) -> Element<Message> {
+    pub fn view(&self, _idx: usize, chart_height: f32) -> Element<'_, Message> {
         Column::new()
             .width(Length::Fill)
             .height(Length::Shrink)

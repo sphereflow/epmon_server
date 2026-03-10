@@ -436,7 +436,7 @@ fn update(state: &mut State, message: Message) {
     state.charts.clear_caches();
 }
 
-fn view(state: &State) -> iced::Element<Message> {
+fn view(state: &State) -> iced::Element<'_, Message> {
     let content = Column::new()
         .spacing(20)
         .align_x(Alignment::Start)
