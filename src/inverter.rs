@@ -15,6 +15,43 @@ pub struct Inverter {
     pub output_ac_frequency: f32,
 }
 
+impl Inverter {
+    pub fn generate_get_commands() -> [Command; 7] {
+        let register_commands = InverterRegisters::generate_get_commands();
+        [
+            register_commands[0],
+            register_commands[1],
+            register_commands[2],
+            LoadStatus::generate_get_command(),
+            InverterHoldings::generate_get_command(),
+            // output_ac_voltage is not available on all hardware
+            Command::ModbusInverterGetHoldings {
+                register_address: 9022,
+                size: 1,
+            },
+            // output_ac_frequency is not available on all hardware
+            Command::ModbusInverterGetHoldings {
+                register_address: 9023,
+                size: 1,
+            },
+        ]
+    }
+}
+
+impl Display for Inverter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Inverter Status:")?;
+        write!(f, "{}", self.registers)?;
+        write!(f, "{}", self.load_status)?;
+        write!(f, "{}", self.holdings)?;
+        writeln!(
+            f,
+            "output voltage: {}, output frequency: {}",
+            self.output_ac_voltage, self.output_ac_frequency
+        )
+    }
+}
+
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct InverterRegisters {
     pub load_input_voltage: f32,
@@ -49,14 +86,27 @@ impl InverterRegisters {
         }
     }
 
-    pub fn data_len() -> usize {
+    pub const fn data_len() -> usize {
         20
     }
-    pub fn generate_get_command() -> Command {
-        Command::ModbusInverterGetInputRegisters {
-            register_address: INVERTER_REGISTERS_BASE_ADDRESS,
-            size: 10,
-        }
+
+    pub const fn generate_get_commands() -> [Command; 3] {
+        [
+            Command::ModbusInverterGetInputRegisters {
+                register_address: INVERTER_REGISTERS_BASE_ADDRESS,
+                size: 8,
+            },
+            // device temperature
+            Command::ModbusInverterGetInputRegisters {
+                register_address: 0x3111,
+                size: 1,
+            },
+            // heatsink temperature
+            Command::ModbusInverterGetInputRegisters {
+                register_address: 0x3112,
+                size: 1,
+            },
+        ]
     }
 }
 
@@ -109,6 +159,21 @@ impl LoadStatus {
             0x01 => StandbyStatus::Running,
             _ => panic!("LoadStatus::running_or_standby: unexpected value"),
         }
+    }
+
+    pub fn generate_get_command() -> Command {
+        Command::ModbusInverterGetInputRegisters {
+            register_address: 0x3202,
+            size: 1,
+        }
+    }
+
+    pub fn from_bytes(bytes: [u8; Self::data_len()]) -> Self {
+        LoadStatus(u16::from_be_bytes(bytes))
+    }
+
+    pub const fn data_len() -> usize {
+        2
     }
 }
 
@@ -230,9 +295,11 @@ impl InverterHoldings {
             high_input_current_recovery_voltage: two_bytes_to_f32([bytes[14], bytes[15]]),
         }
     }
-    pub fn data_len() -> usize {
+
+    pub const fn data_len() -> usize {
         16
     }
+
     pub fn generate_get_command() -> Command {
         Command::ModbusInverterGetHoldings {
             register_address: INVERTER_HOLDINGS_BASE_ADDRESS,

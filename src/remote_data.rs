@@ -1,6 +1,7 @@
 use crate::{
     command::{BufferType, Command},
-    tracer_an::{Rated, Realtime, RealtimeStatus, Stats, VoltageSettings},
+    inverter::{Inverter, InverterHoldings, InverterRegisters, LoadStatus},
+    tracer_an::{two_bytes_to_f32, Rated, Realtime, RealtimeStatus, Stats, VoltageSettings},
 };
 use std::{
     io::{ErrorKind, Read, Write},
@@ -26,6 +27,7 @@ pub enum RemoteData {
     Rated(Rated),
     Stats(Stats),
     LastLogMessage(String),
+    Inverter(Inverter),
     InverterInputPower(Vec<u16>),
     InverterOutputPower(Vec<u16>),
 }
@@ -152,7 +154,7 @@ impl RemoteData {
     ) -> std::io::Result<RemoteData> {
         let write_buf = command.to_bytes();
         println!("Sending Command: {:?}", command);
-        if let Command::ModbusTracerGetInputRegisters {
+        if let Command::ModbusInverterGetInputRegisters {
             register_address: _,
             size,
         } = command
@@ -237,6 +239,64 @@ impl RemoteData {
             energy_voltage_data,
             battery_data,
         }))
+    }
+
+    pub(crate) fn read_inverter(
+        tcp_stream: &mut TcpStream,
+        read_voltage_frequency_setting: bool,
+    ) -> std::io::Result<RemoteData> {
+        let mut inverter: Inverter = Default::default();
+        let commands = Inverter::generate_get_commands();
+
+        // read inverter.registers
+        println!("read_inverter : sending command : {:?}", commands[0]);
+        let write_buf = commands[0].to_bytes();
+        println!("read_inverter : command bytes : {:?}", &write_buf);
+        tcp_stream.write_all(&write_buf)?;
+        let mut receive_buf = [0; InverterRegisters::data_len()];
+        tcp_stream.read_exact(&mut receive_buf[..16])?;
+        let write_buf = commands[1].to_bytes();
+        tcp_stream.write_all(&write_buf)?;
+        tcp_stream.read_exact(&mut receive_buf[16..18])?;
+        let write_buf = commands[2].to_bytes();
+        tcp_stream.write_all(&write_buf)?;
+        tcp_stream.read_exact(&mut receive_buf[18..])?;
+        println!("received bytes for inverter registers: {:?}", receive_buf);
+        inverter.registers = InverterRegisters::from_bytes(&receive_buf);
+
+        // read inverter.load_status
+        let write_buf = commands[3].to_bytes();
+        tcp_stream.write_all(&write_buf)?;
+        let mut receive_buf = [0; LoadStatus::data_len()];
+        tcp_stream.read_exact(&mut receive_buf)?;
+        println!("received bytes for inverter load_status: {:?}", receive_buf);
+        inverter.load_status = LoadStatus::from_bytes(receive_buf);
+
+        // read inverter.holdings
+        let write_buf = commands[4].to_bytes();
+        tcp_stream.write_all(&write_buf)?;
+        let mut receive_buf = [0; InverterHoldings::data_len()];
+        tcp_stream.read_exact(&mut receive_buf)?;
+        println!("received bytes for inverter holdings: {:?}", receive_buf);
+        inverter.holdings = InverterHoldings::from_bytes(&receive_buf);
+
+        if read_voltage_frequency_setting {
+            // read inverter.output_ac_voltage (not available on all hardware)
+            let write_buf = commands[5].to_bytes();
+            tcp_stream.write_all(&write_buf)?;
+            let mut receive_buf = [0; 2];
+            tcp_stream.read_exact(&mut receive_buf)?;
+            inverter.output_ac_voltage = two_bytes_to_f32(receive_buf);
+
+            // read inverter.output_ac_frequency (not available on all hardware)
+            let write_buf = commands[6].to_bytes();
+            tcp_stream.write_all(&write_buf)?;
+            let mut receive_buf = [0; 2];
+            tcp_stream.read_exact(&mut receive_buf)?;
+            inverter.output_ac_frequency = two_bytes_to_f32(receive_buf);
+        }
+
+        Ok(RemoteData::Inverter(inverter))
     }
 
     pub fn take_adc_readings(&mut self) -> Vec<u16> {

@@ -128,6 +128,10 @@ impl Server {
                     let remote_data = RemoteData::read_stats(tcp_stream)?;
                     self.remote_data_sender.send(remote_data)?;
                 }
+                ServerMessage::ReadInverter => {
+                    let remote_data = RemoteData::read_inverter(tcp_stream, false)?;
+                    self.remote_data_sender.send(remote_data)?;
+                }
                 ServerMessage::SetVoltageSettings(cs) => {
                     Self::send_command(cs.generate_set_command(), tcp_stream)?
                 }
@@ -159,7 +163,7 @@ impl Server {
                 println!("holding val: {:?}", &val);
                 self.remote_data_sender.send(val)?;
             }
-            command::Command::ModbusTracerGetInputRegisters { .. } => {
+            command::Command::ModbusInverterGetInputRegisters { .. } => {
                 println!("getting_input_registers");
                 let val = RemoteData::get_input_registers(tcp_stream, command)?;
                 println!("input reg val: {:?}", &val);
@@ -196,6 +200,7 @@ pub enum ServerMessage {
     ReadVoltageSettings,
     ReadRated,
     ReadStats,
+    ReadInverter,
     ReadLastLog,
     SetVoltageSettings(VoltageSettings),
 }

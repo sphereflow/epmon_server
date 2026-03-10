@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
+    inverter::Inverter,
     server_task::ServerMessage,
     time_interval::TimeInterval,
     tracer_an::{
@@ -36,6 +37,7 @@ pub struct AllCharts {
     pub realtime_status_data: RealtimeStatus,
     pub rated_data: Rated,
     pub stats: Stats,
+    pub inverter_stats: Inverter,
     pub voltage_settings: VoltageSettings,
     pub change_voltage_settings: VoltageSettings,
     pub chart_controls: bool,
@@ -107,6 +109,7 @@ impl Default for AllCharts {
             change_voltage_settings: Default::default(),
             rated_data: Default::default(),
             stats: Default::default(),
+            inverter_stats: Default::default(),
             connected: Arc::new(Mutex::new(false)),
             log: Vec::new(),
         }
@@ -336,7 +339,7 @@ impl AllCharts {
 
     fn view_modbus(&self) -> Element<Message> {
         let register_text_input = text_input(
-            "enter register address of holding",
+            "enter address of holding/register",
             &self.register_address_string,
         )
         .width(140)
@@ -379,11 +382,16 @@ impl AllCharts {
         let realtime_status_col = Column::new()
             .push(read_realtime_status_button)
             .push(realtime_status_text);
+        let get_inverter_button =
+            Button::new("read inverter status").on_press(Message::ReadInverter);
+        let inverter_text = text(format!("{}", self.inverter_stats));
+        let inverter_col = Column::new().push(get_inverter_button).push(inverter_text);
         let row1 = Row::new()
             .push(Space::new(100, 10))
             .push(register_col)
             .push(realtime_col)
             .push(realtime_status_col)
+            .push(inverter_col)
             .spacing(100);
         let row2 = Row::new()
             .push(Space::new(100, 10))

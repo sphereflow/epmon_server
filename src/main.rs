@@ -74,6 +74,7 @@ pub enum Message {
     ReadVoltageSettings,
     ReadRated,
     ReadStats,
+    ReadInverter,
     BatteryTypeSelected(BatteryType),
     InputOverVoltageDisconnect(String),
     InputChargingLimitVoltage(String),
@@ -192,6 +193,9 @@ impl State {
             RemoteData::Stats(stats) => {
                 self.charts.stats = stats;
             }
+            RemoteData::Inverter(inverter) => {
+                self.charts.inverter_stats = inverter;
+            }
             RemoteData::LastLogMessage(last_log) => {
                 self.charts.log.push(last_log);
             }
@@ -270,7 +274,7 @@ fn update(state: &mut State, message: Message) {
             state
                 .server_message_sender
                 .send(ServerMessage::Command(
-                    Command::ModbusTracerGetInputRegisters {
+                    Command::ModbusInverterGetInputRegisters {
                         register_address,
                         size,
                     },
@@ -305,6 +309,12 @@ fn update(state: &mut State, message: Message) {
             state
                 .server_message_sender
                 .send(ServerMessage::ReadStats)
+                .expect("command sender: could not send command");
+        }
+        Message::ReadInverter => {
+            state
+                .server_message_sender
+                .send(ServerMessage::ReadInverter)
                 .expect("command sender: could not send command");
         }
         Message::TabSelected(ix) => match ix {
