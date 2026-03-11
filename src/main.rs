@@ -242,11 +242,13 @@ fn update(state: &mut State, message: Message) {
                 .inverter_output_power
                 .integration_sub_range
                 .start = min;
+            state.charts.clear_caches();
         }
         Message::MaxIntegrationSubRange(max) => {
             state.charts.pv_power.integration_sub_range.end = max;
             state.charts.inverter_input_power.integration_sub_range.end = max;
             state.charts.inverter_output_power.integration_sub_range.end = max;
+            state.charts.clear_caches();
         }
         Message::PauseUnpause => state.charts.paused = !state.charts.paused,
         Message::AddressInput(s) => {
@@ -433,7 +435,6 @@ fn update(state: &mut State, message: Message) {
 
         Message::FontLoaded(_) => {}
     }
-    state.charts.clear_caches();
 }
 
 fn view(state: &State) -> iced::Element<'_, Message> {
@@ -463,5 +464,5 @@ fn subscription(state: &State) -> Subscription<Message> {
 }
 
 fn adc_reading_to_voltage(adc_reading: u16) -> f32 {
-    (20700.0 / 124.0) * 1.1751 * adc_reading as f32 / 4081.0
+    (20700.0 / 750.0) * 1.20725 * adc_reading as f32 / 4081.0
 }

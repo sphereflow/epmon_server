@@ -617,6 +617,7 @@ impl AllCharts {
         self.inverter_input_power.max_y = self.max_y * 6.0;
         self.inverter_output_power.min_y = self.min_y * 6.0;
         self.inverter_output_power.max_y = self.max_y * 6.0;
+        self.clear_caches();
     }
 
     pub fn clear_caches(&mut self) {

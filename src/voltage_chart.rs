@@ -219,6 +219,10 @@ impl Chart<Message> for CustomChart {
             .build_cartesian_2d(self.min_time..self.max_time, self.min_y..self.max_y)
             .expect("failed to build chart");
 
+        let y_label_format_function: Box<dyn Fn(&f32) -> String> = match self.chart_type {
+            ChartType::Voltage => Box::new(|y| format!("{:.2} {}", y, y_unit_text)),
+            ChartType::Power => Box::new(|y| format!("{:.0} {}", y, y_unit_text)),
+        };
         chart
             .configure_mesh()
             .bold_line_style(plotters::style::colors::BLUE.mix(0.1))
@@ -244,7 +248,7 @@ impl Chart<Message> for CustomChart {
                     format!("{:.0}m", x / 60.0)
                 }
             })
-            .y_label_formatter(&|y| format!("{:.1} {}", y, y_unit_text))
+            .y_label_formatter(&*y_label_format_function)
             .draw()
             .expect("failed to draw chart mesh");
 
